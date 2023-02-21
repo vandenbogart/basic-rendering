@@ -1,12 +1,11 @@
 use std::time::Duration;
 
-use winit::event::{VirtualKeyCode, ElementState};
+use winit::event::{ElementState, VirtualKeyCode};
 
 use super::{System, WASDControllerComponent};
 
 pub struct InputSystem {
-    keys: Vec<(VirtualKeyCode, ElementState)>
-
+    keys: Vec<(VirtualKeyCode, ElementState)>,
 }
 impl InputSystem {
     pub fn new() -> Self {
@@ -18,15 +17,23 @@ impl InputSystem {
 }
 impl Default for InputSystem {
     fn default() -> Self {
-        Self { keys: Default::default() }
+        Self {
+            keys: Default::default(),
+        }
     }
 }
 impl System for InputSystem {
-    fn run(&mut self, world: &mut crate::World, dt: Duration) {
+    fn run(&mut self, world: &mut crate::World, _dt: Duration) {
         for key in &self.keys {
             match key {
-                (VirtualKeyCode::W | VirtualKeyCode::A | VirtualKeyCode::S | VirtualKeyCode::D, ElementState::Pressed | ElementState::Released) => {
-                    let result = world.query().with_component::<WASDControllerComponent>().execute();
+                (
+                    VirtualKeyCode::W | VirtualKeyCode::A | VirtualKeyCode::S | VirtualKeyCode::D,
+                    ElementState::Pressed | ElementState::Released,
+                ) => {
+                    let result = world
+                        .query()
+                        .with_component::<WASDControllerComponent>()
+                        .execute();
                     result.get_entities().iter().for_each(|ent| {
                         let mut comp = result.get_component_mut::<WASDControllerComponent>(*ent);
                         match key {
@@ -38,12 +45,11 @@ impl System for InputSystem {
                             (VirtualKeyCode::S, ElementState::Released) => comp.s = 0,
                             (VirtualKeyCode::D, ElementState::Pressed) => comp.d = 1,
                             (VirtualKeyCode::D, ElementState::Released) => comp.d = 0,
-                            _ => ()
+                            _ => (),
                         }
                     })
-                    
-                },
-                _ => ()
+                }
+                _ => (),
             }
         }
         self.keys = Default::default();

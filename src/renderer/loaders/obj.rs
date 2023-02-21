@@ -5,7 +5,7 @@ use std::{fs, io::BufReader};
 
 use wgpu::{Device, Queue, Texture};
 
-use super::super::{Mesh, Material, Vertex, Model};
+use super::super::{Material, Mesh, Model, Vertex};
 
 pub async fn load_texture(
     queue: &Queue,
@@ -112,7 +112,14 @@ pub async fn load_model(
                         m.mesh.positions[i * 3 + 1],
                         m.mesh.positions[i * 3 + 2],
                     ],
-                    tex_coords: if m.mesh.texcoords.len() > 0 { [m.mesh.texcoords[i * 2 + 0], 1.0 - m.mesh.texcoords[i * 2 + 1]] } else { [0.0, 0.0] },
+                    tex_coords: if m.mesh.texcoords.len() > 0 {
+                        [
+                            m.mesh.texcoords[i * 2 + 0],
+                            1.0 - m.mesh.texcoords[i * 2 + 1],
+                        ]
+                    } else {
+                        [0.0, 0.0]
+                    },
                     normals: [
                         m.mesh.normals[i * 3 + 0],
                         m.mesh.normals[i * 3 + 1],
@@ -150,4 +157,3 @@ pub async fn load_model(
         name: String::from(path.to_str().unwrap()),
     })
 }
-

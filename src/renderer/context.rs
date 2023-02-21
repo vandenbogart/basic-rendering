@@ -1,7 +1,6 @@
-use wgpu::{SurfaceConfiguration, Surface, Queue, Device};
+use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 
 use crate::window::Window;
-
 
 pub struct Context {
     pub device: Device,
@@ -17,7 +16,7 @@ impl Context {
             device,
             queue,
             surface,
-            surface_config
+            surface_config,
         })
     }
 

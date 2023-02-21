@@ -1,8 +1,13 @@
-use std::{collections::HashMap, any::TypeId, rc::Rc, cell::{RefCell, RefMut, Ref}};
+use std::{
+    any::TypeId,
+    cell::{Ref, RefCell, RefMut},
+    collections::HashMap,
+    rc::Rc,
+};
 
-use crate::{EntityComponentMap, ComponentId, ComponentList, ComponentBitmap, Component, EntityId};
+use crate::{Component, ComponentBitmap, ComponentId, ComponentList, EntityComponentMap, EntityId};
 
-use crate::query::{EntityQuery};
+use crate::query::EntityQuery;
 
 pub struct ComponentManager {
     entities: Vec<EntityComponentMap>,
@@ -26,9 +31,12 @@ impl ComponentManager {
         }
     }
 
-    pub fn get_component_bitmap<T: Component + 'static>(&self) -> ComponentBitmap{
+    pub fn get_component_bitmap<T: Component + 'static>(&self) -> ComponentBitmap {
         let id = TypeId::of::<T>();
-        self.component_bitmaps.get(&id).expect("Attempted to access component which was not registered").clone()
+        self.component_bitmaps
+            .get(&id)
+            .expect("Attempted to access component which was not registered")
+            .clone()
     }
 
     pub fn add_entity(&mut self) -> EntityId {
@@ -59,19 +67,27 @@ impl ComponentManager {
     }
     pub fn get_component<T: Component + 'static>(&self, entity: EntityId) -> Ref<T> {
         let c_id = TypeId::of::<T>();
-        let components = self.components.get(&c_id).expect("Attempted to get component which was not registered");
-        let component_data = components[entity].as_ref().expect("Attempted to get component for entity which did not have it").borrow();
-        Ref::map(component_data,|any| {
-            any.downcast_ref::<T>().unwrap()
-        })
+        let components = self
+            .components
+            .get(&c_id)
+            .expect("Attempted to get component which was not registered");
+        let component_data = components[entity]
+            .as_ref()
+            .expect("Attempted to get component for entity which did not have it")
+            .borrow();
+        Ref::map(component_data, |any| any.downcast_ref::<T>().unwrap())
     }
     pub fn get_component_mut<T: Component + 'static>(&self, entity: EntityId) -> RefMut<T> {
         let c_id = TypeId::of::<T>();
-        let components = self.components.get(&c_id).expect("Attempted to get component which was not registered");
-        let component_data = components[entity].as_ref().expect("Attempted to get component for entity which did not have it").borrow_mut();
-        RefMut::map(component_data,|any| {
-            any.downcast_mut::<T>().unwrap()
-        })
+        let components = self
+            .components
+            .get(&c_id)
+            .expect("Attempted to get component which was not registered");
+        let component_data = components[entity]
+            .as_ref()
+            .expect("Attempted to get component for entity which did not have it")
+            .borrow_mut();
+        RefMut::map(component_data, |any| any.downcast_mut::<T>().unwrap())
     }
     pub fn get_entities_with_components(
         &self,
@@ -86,7 +102,8 @@ impl ComponentManager {
                 } else {
                     None
                 }
-            }).collect()
+            })
+            .collect()
     }
     pub fn query(&self) -> EntityQuery {
         EntityQuery::new(self)
@@ -172,8 +189,6 @@ mod tests {
         assert_eq!(cm.entities[entity] == 3, true);
     }
 
-
-    
     #[test]
     fn get_component() {
         let mut cm = ComponentManager::new();
@@ -196,5 +211,4 @@ mod tests {
         let component = cm.get_component::<DataComponent>(entity1);
         assert_eq!(component.value, 1);
     }
-
 }

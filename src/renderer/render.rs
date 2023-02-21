@@ -1,16 +1,16 @@
-use std::{cell::Ref, collections::HashMap, path::Path, time::Duration};
+use std::{cell::Ref, collections::HashMap, path::Path};
 
-use cgmath::{Rotation3, One};
+use cgmath::One;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, Buffer, BufferUsages, CommandEncoder, RenderPass, Texture, TextureView,
+    BindGroup, Buffer, BufferUsages, Texture, TextureView,
 };
 
-use crate::{window::Window, EntityId, ResourceId, ResourceIndex};
+use crate::{window::Window, EntityId, ResourceIndex};
 
 use super::{
-    context::Context, loaders::obj::load_model, pipeline_default::DefaultPipeline, Globals,
-    Instance, Locals, ModelComponent, ModelResource, GeometryComponent,
+    context::Context, loaders::obj::load_model, pipeline_default::DefaultPipeline,
+    GeometryComponent, Globals, Instance, Locals, ModelComponent, ModelResource,
 };
 
 pub struct Renderer {
@@ -29,7 +29,7 @@ impl Renderer {
             .await
             .expect("Failed to initialize context");
         let globals = Globals {
-            view_proj: cgmath::Matrix4::one().into(), 
+            view_proj: cgmath::Matrix4::one().into(),
             ambient_strength: 0.1,
             ambient_color: [0.0, 1.0, 0.0],
         };

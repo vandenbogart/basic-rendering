@@ -1,9 +1,9 @@
-use wgpu::{RenderPipeline, ColorTargetState, PipelineLayoutDescriptor, RenderPipelineDescriptor};
+use wgpu::{ColorTargetState, PipelineLayoutDescriptor, RenderPipeline, RenderPipelineDescriptor};
 
-use super::{context::Context, InstanceRaw, Vertex, Instance};
+use super::{context::Context, Instance, InstanceRaw, Vertex};
 
 pub struct DefaultPipeline {
-    pub render_pipeline: RenderPipeline
+    pub render_pipeline: RenderPipeline,
 }
 
 impl DefaultPipeline {
@@ -15,7 +15,7 @@ impl DefaultPipeline {
                 source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
             });
 
-        let instance_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
+        let _instance_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Instance buffer"),
             size: (std::mem::size_of::<InstanceRaw>() * 100) as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
@@ -42,9 +42,10 @@ impl DefaultPipeline {
         };
 
         let globals_bind_group_layout =
-            context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
+            context
+                .device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: &[wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         count: None,
                         ty: wgpu::BindingType::Buffer {
@@ -53,15 +54,15 @@ impl DefaultPipeline {
                             min_binding_size: None,
                         },
                         visibility: wgpu::ShaderStages::all(),
-                    },
-                ],
-                label: Some("Globals Bind Group"),
-            });
+                    }],
+                    label: Some("Globals Bind Group"),
+                });
 
         let locals_bind_group_layout =
-            context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
+            context
+                .device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: &[wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         count: None,
                         ty: wgpu::BindingType::Buffer {
@@ -70,10 +71,9 @@ impl DefaultPipeline {
                             min_binding_size: None,
                         },
                         visibility: wgpu::ShaderStages::all(),
-                    },
-                ],
-                label: Some("Locals Bind Group"),
-            });
+                    }],
+                    label: Some("Locals Bind Group"),
+                });
 
         let layout_descriptor = context
             .device
@@ -103,9 +103,6 @@ impl DefaultPipeline {
                     conservative: false,
                 },
             });
-            DefaultPipeline {
-                render_pipeline,
-            }
+        DefaultPipeline { render_pipeline }
     }
-
 }

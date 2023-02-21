@@ -1,11 +1,11 @@
-use std::f32::consts::PI;
-
-use cgmath::{Quaternion, Rotation3};
 use playground::{
     renderer::{
         render::Renderer, CameraFollowComponent, GeometryComponent, ModelComponent, ModelResource,
     },
-    systems::{input::InputSystem, movement::MovementSystem, System, WASDControllerComponent, camera::CameraSystem},
+    systems::{
+        camera::CameraSystem, input::InputSystem, movement::MovementSystem, System,
+        WASDControllerComponent,
+    },
     *,
 };
 use winit::event::KeyboardInput;

@@ -1,13 +1,13 @@
 use std::{
     any::{Any, TypeId},
-    cell::{RefCell, Ref},
-    rc::{Rc},
+    cell::{Ref, RefCell},
+    rc::Rc,
 };
 mod component;
 mod query;
+pub mod renderer;
 mod resource;
 pub mod systems;
-pub mod renderer;
 pub mod window;
 
 type ComponentId = TypeId;

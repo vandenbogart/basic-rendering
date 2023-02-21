@@ -1,12 +1,12 @@
-use std::{cell::{Ref, RefMut}};
+use std::cell::{Ref, RefMut};
 
-use crate::{EntityId, component::ComponentManager, EntityComponentMap, Component};
+use crate::{component::ComponentManager, Component, EntityComponentMap, EntityId};
 
 pub struct EntityQueryResult<'a> {
     entities: Vec<EntityId>,
-    component_manager: &'a ComponentManager
+    component_manager: &'a ComponentManager,
 }
-impl <'a> EntityQueryResult<'a> {
+impl<'a> EntityQueryResult<'a> {
     pub fn get_entities(&self) -> &Vec<EntityId> {
         &self.entities
     }
@@ -36,10 +36,12 @@ impl<'a> EntityQuery<'a> {
         self
     }
     pub fn execute(self) -> EntityQueryResult<'a> {
-        let entities = self.component_manager.get_entities_with_components(self.query_bitmap);
+        let entities = self
+            .component_manager
+            .get_entities_with_components(self.query_bitmap);
         EntityQueryResult {
             entities,
-            component_manager: self.component_manager
+            component_manager: self.component_manager,
         }
     }
 }
@@ -70,7 +72,11 @@ mod tests {
         cm.add_component(entity1, DummyComponent {});
         cm.add_component(entity1, DummyComponent2 {});
         cm.add_component(entity2, DummyComponent2 {});
-        let result = cm.query().with_component::<DummyComponent>().with_component::<DummyComponent2>().execute();
+        let result = cm
+            .query()
+            .with_component::<DummyComponent>()
+            .with_component::<DummyComponent2>()
+            .execute();
         assert_eq!(result.entities.contains(&entity1), true);
         let result = cm.query().with_component::<DummyComponent2>().execute();
         assert_eq!(result.entities.contains(&entity1), true);

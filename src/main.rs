@@ -64,7 +64,10 @@ pub async fn run() -> anyhow::Result<()> {
         window::Event::Redraw => {
             renderer.draw(&mut world, camera.view_proj());
         }
-        window::Event::Resize { width, height } => {}
+        window::Event::Resize { width, height } => {
+            renderer.resize(width, height);
+            camera.resize(width, height);
+        }
         window::Event::Loop { delta_time } => {
             input.run(&mut world, delta_time);
             movement.run(&mut world, delta_time);

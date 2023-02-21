@@ -1,0 +1,4 @@
+{
+    "rust-analyzer.semanticHighlighting.operator.enable": false,
+    "rust-analyzer.semanticHighlighting.strings.enable": false
+}

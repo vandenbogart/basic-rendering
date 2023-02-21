@@ -24,7 +24,6 @@ impl Default for InputSystem {
 impl System for InputSystem {
     fn run(&mut self, world: &mut crate::World, dt: Duration) {
         for key in &self.keys {
-            
             match key {
                 (VirtualKeyCode::W | VirtualKeyCode::A | VirtualKeyCode::S | VirtualKeyCode::D, ElementState::Pressed | ElementState::Released) => {
                     let result = world.query().with_component::<WASDControllerComponent>().execute();

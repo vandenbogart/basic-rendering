@@ -39,6 +39,39 @@ impl Renderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+
+        let default_pipeline = DefaultPipeline::new(&context);
+
+        let globals_bind_group = context
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("globals bind_group"),
+                layout: &default_pipeline.render_pipeline.get_bind_group_layout(0),
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: globals_buffer.as_entire_binding(),
+                }],
+            });
+
+        let (depth_texture, depth_texture_view) = Renderer::init_depth_texture(&context);
+
+        Renderer {
+            context,
+            globals,
+            globals_buffer,
+            globals_bind_group,
+            depth_texture,
+            depth_texture_view,
+            default_pipeline,
+        }
+    }
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.context.resize(width, height);
+        let (depth_texture, depth_texture_view) = Renderer::init_depth_texture(&self.context);
+        self.depth_texture = depth_texture;
+        self.depth_texture_view = depth_texture_view;
+    }
+    fn init_depth_texture(context: &Context) -> (Texture, TextureView) {
         let depth_texture = context.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Depth texture"),
             dimension: wgpu::TextureDimension::D2,
@@ -55,29 +88,7 @@ impl Renderer {
         });
 
         let depth_texture_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let default_pipeline = DefaultPipeline::new(&context);
-
-        let globals_bind_group = context
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("globals bind_group"),
-                layout: &default_pipeline.render_pipeline.get_bind_group_layout(0),
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: globals_buffer.as_entire_binding(),
-                }],
-            });
-
-
-        Renderer {
-            context,
-            globals,
-            globals_buffer,
-            globals_bind_group,
-            depth_texture,
-            depth_texture_view,
-            default_pipeline,
-        }
+        (depth_texture, depth_texture_view)
     }
     pub async fn create_model_resource(&self, filepath: String) -> ModelResource {
         dbg!(&filepath);

@@ -4,7 +4,7 @@ use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::renderer::{CameraFollowComponent, GeometryComponent};
 
-use super::{System, WASDControllerComponent};
+use super::System;
 
 pub struct Camera {
     pub eye: cgmath::Point3<f32>,
@@ -66,6 +66,10 @@ impl CameraSystem {
             right: 0.0,
             left: 0.0,
         }
+    }
+    pub fn resize(&mut self, width: u32, height: u32) {
+        let aspect = width as f32 / height as f32;
+        self.camera = Camera::new(aspect);
     }
     pub fn process_keyboard(&mut self, keycode: VirtualKeyCode, state: ElementState) {
         match (keycode, state) {

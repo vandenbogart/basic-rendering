@@ -1,15 +1,12 @@
-use std::{path::Path, cell::Ref};
-
 use cgmath::{Rotation3, Vector3};
 use wgpu::{vertex_attr_array, Texture};
 
 use crate::{Component, Resource, ResourceIndex};
 
-
 mod context;
-pub mod render;
-mod pipeline_default;
 mod loaders;
+mod pipeline_default;
+pub mod render;
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
@@ -97,9 +94,7 @@ pub struct ModelComponent {
 }
 impl ModelComponent {
     pub fn new(model_index: ResourceIndex) -> ModelComponent {
-        ModelComponent {
-            model_index,
-        }
+        ModelComponent { model_index }
     }
 }
 impl Component for ModelComponent {}
@@ -112,7 +107,11 @@ pub struct GeometryComponent {
     pub forward: cgmath::Vector3<f32>,
 }
 impl GeometryComponent {
-    pub fn new(position: Option<cgmath::Vector3<f32>>, rotation: Option<cgmath::Quaternion<f32>>, forward: Option<cgmath::Vector3<f32>>) -> Self {
+    pub fn new(
+        position: Option<cgmath::Vector3<f32>>,
+        rotation: Option<cgmath::Quaternion<f32>>,
+        forward: Option<cgmath::Vector3<f32>>,
+    ) -> Self {
         let position = match position {
             Some(pos) => pos,
             None => cgmath::Vector3::new(0.0, 0.0, 0.0),
@@ -134,25 +133,24 @@ impl GeometryComponent {
 }
 impl Default for GeometryComponent {
     fn default() -> Self {
-        Self { position: cgmath::Vector3::new(0.0, 0.0, 0.0), rotation: cgmath::Quaternion::from_angle_y(cgmath::Rad(0.0)), forward: Vector3::unit_x() }
+        Self {
+            position: cgmath::Vector3::new(0.0, 0.0, 0.0),
+            rotation: cgmath::Quaternion::from_angle_y(cgmath::Rad(0.0)),
+            forward: Vector3::unit_x(),
+        }
     }
 }
 impl Component for GeometryComponent {}
 
 pub struct ModelResource {
-    model: Model
+    model: Model,
 }
 impl ModelResource {
-    pub fn new(model: Model) -> ModelResource{
-        ModelResource {
-            model,
-        }
+    pub fn new(model: Model) -> ModelResource {
+        ModelResource { model }
     }
 }
-impl Resource for ModelResource {
-
-}
-
+impl Resource for ModelResource {}
 
 pub struct Material {
     pub name: String,

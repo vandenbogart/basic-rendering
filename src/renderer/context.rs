@@ -1,4 +1,4 @@
-use wgpu::{SurfaceConfiguration, Surface, Queue, Device, BindGroupLayout};
+use wgpu::{SurfaceConfiguration, Surface, Queue, Device};
 
 use crate::window::Window;
 
@@ -17,7 +17,7 @@ impl Context {
             device,
             queue,
             surface,
-            surface_config,
+            surface_config
         })
     }
 

@@ -30,6 +30,7 @@ impl Component for Position {}
 type ComponentBitmap = u64;
 type EntityComponentMap = u64;
 type EntityId = usize;
+
 pub struct World {
     component_manager: component::ComponentManager,
     resource_manager: resource::ResourceManager,

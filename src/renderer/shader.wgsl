@@ -40,6 +40,7 @@ struct VertexOutput {
     @location(0) world_normal: vec3<f32>,
     @location(1) world_position: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,
+    @location(3) color: vec3<f32>
 };
 
 @vertex
@@ -63,21 +64,20 @@ fn vs_main(
     out.world_position = world_position.xyz;
     out.world_normal = normal_matrix *  model.normal;
     out.tex_coords = model.tex_coords;
+    out.color = model.color;
     out.clip_position = globals.view_proj * world_position;
     return out;
 }
 
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color = vec4<f32>(0.7, 0.7, 0.7, 1.0);
     let ambient_color = globals.ambient_color * globals.ambient_strength;
 
 
     let light_dir = normalize(locals.diffuse_light_position.xyz - in.world_position);
-    let diffuse_intensity = max(dot(light_dir, in.world_normal), 0.0);
+    let diffuse_intensity = max(dot(light_dir, in.world_normal), 0.0) * locals.diffuse_light_color.a;
     let diffuse_color = locals.diffuse_light_color.xyz * diffuse_intensity;
 
-    let result = (diffuse_intensity + ambient_color) * object_color.xyz;
-    return vec4<f32>(result, object_color.a);
+    let result = (diffuse_intensity + ambient_color) * in.color;
+    return vec4<f32>(result, 1.0);
 }

@@ -6,14 +6,15 @@ use crate::{Component, Resource, ResourceIndex};
 mod context;
 mod loaders;
 mod pipeline_default;
+mod pipeline_depth;
 pub mod render;
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
 pub struct Globals {
     pub view_proj: [[f32; 4]; 4],
-    ambient_color: [f32; 3],
-    ambient_strength: f32,
+    pub ambient_color: [f32; 3],
+    pub ambient_strength: f32,
 }
 
 #[repr(C)]
@@ -46,7 +47,7 @@ impl Vertex {
 }
 
 pub struct Instance {
-    pub position: cgmath::Vector3<f32>,
+    pub position: cgmath::Point3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
 }
 
@@ -68,7 +69,8 @@ impl Instance {
     }
     pub fn to_raw(&self) -> InstanceRaw {
         let prmat =
-            cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation);
+            cgmath::Matrix4::from_translation(self.position - cgmath::point3(0.0, 0.0, 0.0))
+                * cgmath::Matrix4::from(self.rotation);
         let nmat = cgmath::Matrix3::from(self.rotation);
         InstanceRaw {
             pr_matrix: prmat.into(),
@@ -102,19 +104,19 @@ impl Component for ModelComponent {}
 pub struct CameraFollowComponent {}
 impl Component for CameraFollowComponent {}
 pub struct GeometryComponent {
-    pub position: cgmath::Vector3<f32>,
+    pub position: cgmath::Point3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
     pub forward: cgmath::Vector3<f32>,
 }
 impl GeometryComponent {
     pub fn new(
-        position: Option<cgmath::Vector3<f32>>,
+        position: Option<cgmath::Point3<f32>>,
         rotation: Option<cgmath::Quaternion<f32>>,
         forward: Option<cgmath::Vector3<f32>>,
     ) -> Self {
         let position = match position {
             Some(pos) => pos,
-            None => cgmath::Vector3::new(0.0, 0.0, 0.0),
+            None => cgmath::Point3::new(0.0, 0.0, 0.0),
         };
         let rotation = match rotation {
             Some(rot) => rot,
@@ -134,7 +136,7 @@ impl GeometryComponent {
 impl Default for GeometryComponent {
     fn default() -> Self {
         Self {
-            position: cgmath::Vector3::new(0.0, 0.0, 0.0),
+            position: cgmath::Point3::new(0.0, 0.0, 0.0),
             rotation: cgmath::Quaternion::from_angle_y(cgmath::Rad(0.0)),
             forward: Vector3::unit_x(),
         }

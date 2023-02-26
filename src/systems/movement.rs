@@ -4,7 +4,7 @@ use cgmath::Rotation3;
 
 use crate::renderer::GeometryComponent;
 
-use super::{System, WASDControllerComponent};
+use super::{ClickMoveComponent, System};
 
 pub struct MovementSystem {}
 impl MovementSystem {
@@ -13,26 +13,20 @@ impl MovementSystem {
     }
 }
 impl System for MovementSystem {
-    fn run(&mut self, world: &mut crate::World, dt: Duration) {
+    fn run(&mut self, world: &mut crate::World, dt: f32) {
         let result = world
             .query()
-            .with_component::<WASDControllerComponent>()
+            .with_component::<ClickMoveComponent>()
             .with_component::<GeometryComponent>()
             .execute();
         result.get_entities().iter().for_each(|ent| {
-            let wasd = result.get_component::<WASDControllerComponent>(*ent);
+            let move_comp = result.get_component::<ClickMoveComponent>(*ent);
             let mut geo = result.get_component_mut::<GeometryComponent>(*ent);
-            if wasd.d == 1 && wasd.a == 0 {
-                geo.rotation = geo.rotation
-                    * cgmath::Quaternion::from_angle_y(cgmath::Rad(PI * dt.as_secs_f32()));
-            }
-            if wasd.a == 1 && wasd.d == 0 {
-                geo.rotation = geo.rotation
-                    * cgmath::Quaternion::from_angle_y(cgmath::Rad(-PI * dt.as_secs_f32()));
-            }
-            if wasd.w == 1 {
-                let direction = geo.rotation * geo.forward;
-                geo.position = geo.position + (direction * wasd.speed as f32 * dt.as_secs_f32());
+            match move_comp.move_towards(geo.position, dt) {
+                Some(pos) => {
+                    geo.position = pos
+                }
+                None => (),
             }
         })
     }

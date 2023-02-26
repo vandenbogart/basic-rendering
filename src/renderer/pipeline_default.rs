@@ -15,12 +15,12 @@ impl DefaultPipeline {
                 source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
             });
 
-        let _instance_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Instance buffer"),
-            size: (std::mem::size_of::<InstanceRaw>() * 100) as wgpu::BufferAddress,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        // let _instance_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
+        //     label: Some("Instance buffer"),
+        //     size: (std::mem::size_of::<InstanceRaw>() * 100) as wgpu::BufferAddress,
+        //     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        //     mapped_at_creation: false,
+        // });
         let depth_stencil = wgpu::DepthStencilState {
             bias: wgpu::DepthBiasState::default(),
             depth_compare: wgpu::CompareFunction::LessEqual,

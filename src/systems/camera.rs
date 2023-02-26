@@ -1,10 +1,11 @@
-use std::{f32::consts::PI, time::Duration};
+use std::{f32::consts::{PI, LN_10}, time::{Duration, Instant}};
 
+use cgmath::SquareMatrix;
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::renderer::{CameraFollowComponent, GeometryComponent};
 
-use super::System;
+use super::{System, ClickMoveComponent, ClickMoveState};
 
 pub struct Camera {
     pub eye: cgmath::Point3<f32>,
@@ -26,19 +27,24 @@ const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 impl Camera {
     pub fn new(aspect: f32) -> Camera {
         Camera {
-            eye: (0.0, 10.0, 30.0).into(),
+            eye: (0.0, 100.0, 300.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3::unit_y(),
             aspect,
             fovy: 45.0,
             znear: 0.1,
-            zfar: 100.0,
+            zfar: 1000.0,
         }
     }
     pub fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         OPENGL_TO_WGPU_MATRIX * proj * view
+    }
+    pub fn build_reverse_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
+        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
+        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+        (OPENGL_TO_WGPU_MATRIX * proj * view).invert().unwrap()
     }
 }
 
@@ -52,23 +58,29 @@ pub struct CameraSystem {
     down: f32,
     left: f32,
     right: f32,
+    width: f32,
+    height: f32,
 }
 impl CameraSystem {
-    pub fn new(aspect: f32) -> Self {
+    pub fn new(width: f32, height: f32) -> Self {
         Self {
-            camera: Camera::new(aspect),
+            camera: Camera::new(width / height),
             speed: 1.0,
-            radius: 20.0,
+            radius: 200.0,
             pos_x: 0.0,
             pos_y: 0.0,
             up: 0.0,
             down: 0.0,
             right: 0.0,
             left: 0.0,
+            width,
+            height,
         }
     }
     pub fn resize(&mut self, width: u32, height: u32) {
         let aspect = width as f32 / height as f32;
+        self.width = width as f32;
+        self.height = height as f32;
         self.camera = Camera::new(aspect);
     }
     pub fn process_keyboard(&mut self, keycode: VirtualKeyCode, state: ElementState) {
@@ -103,9 +115,46 @@ impl CameraSystem {
     pub fn view_proj(&self) -> cgmath::Matrix4<f32> {
         self.camera.build_view_projection_matrix()
     }
+    pub fn view_to_world_coords(&self, x: f32, y: f32, z: f32) -> cgmath::Point3<f32> {
+        let ndc = cgmath::vec4(2.0 * (x / self.width), 2.0 * ((self.height - y) / self.height), z, 1.0);
+        let ndc = ndc + cgmath::vec4(-1.0, -1.0, 0.0, 0.0);
+        let rv_mat = self.camera.build_reverse_view_projection_matrix();
+        let a = rv_mat * ndc;
+        let a = a / a.w;
+        // let L0 = self.camera.eye;
+        // let L = cgmath::point3(a.x, a.y, a.z) - L0;
+        // let n: cgmath::Vector3<f32> = cgmath::Vector3::unit_y();
+        // let n0 = cgmath::point3(0.0, 0.0, 0.0);
+        // let t = cgmath::dot(n0 - L0, n) / cgmath::dot(L, n);
+        // // todo project onto plane
+        // let a = L0 + t * L;
+        dbg!(a);
+        cgmath::point3(a.x, a.y, a.z)
+    }
 }
 impl System for CameraSystem {
-    fn run(&mut self, world: &mut crate::World, dt: Duration) {
+    fn run(&mut self, world: &mut crate::World, dt: f32) {
+
+        let result = world.query().with_component::<ClickMoveComponent>().execute();
+        result.get_entities().iter().for_each(|ent| {
+            let mut comp = result.get_component_mut::<ClickMoveComponent>(*ent);
+            match (comp.last_click_pos, comp.state) {
+                (Some(pos), ClickMoveState::Move) => {
+                    let now = Instant::now();
+                    let r = world.renderer.borrow();
+                    let depth_values = &r.depth_values;
+                    let depth_width = r.depth_width;
+                    let z = depth_values[pos.y as usize * depth_width as usize + pos.x as usize];
+                    dbg!(z);
+                    comp.move_coord = Some(self.view_to_world_coords(pos.x, pos.y, z));
+                    comp.state = ClickMoveState::Waiting;
+                },
+                _ => ()
+            }
+            
+        });
+
+
         let result = world
             .query()
             .with_component::<CameraFollowComponent>()
@@ -113,7 +162,7 @@ impl System for CameraSystem {
             .execute();
         let entity = result.get_entities()[0];
         let follow_position = result.get_component::<GeometryComponent>(entity).position;
-        let dt = dt.as_secs_f32();
+        let dt = dt;
 
         if self.right == 1.0 && self.left == 0.0 {
             self.pos_x += self.speed * dt;

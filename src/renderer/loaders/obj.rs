@@ -94,7 +94,6 @@ pub async fn load_model(
             name: mat.name.to_string(),
             diffuse_texture: None,
         };
-        dbg!(&mat.diffuse_texture);
         if mat.diffuse_texture.len() > 0 {
             let texture = load_texture(queue, device, &mat.diffuse_texture).await?;
             new_mat.diffuse_texture = Some(texture);
@@ -125,7 +124,16 @@ pub async fn load_model(
                         m.mesh.normals[i * 3 + 1],
                         m.mesh.normals[i * 3 + 2],
                     ],
-                    color: [0.0, 0.0, 0.0],
+                    color: if m.mesh.vertex_color.len() > 0 {
+                        [
+                            m.mesh.vertex_color[i * 3 + 0],
+                            m.mesh.vertex_color[i * 3 + 1],
+                            m.mesh.vertex_color[i * 3 + 2],
+                        ]
+                        
+                    } else {
+                        [1.0, 1.0, 1.0]
+                    }
                 })
                 .collect::<Vec<_>>();
             use wgpu::util::DeviceExt;

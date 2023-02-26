@@ -1,7 +1,11 @@
-use std::time::Duration;
+use core::f64;
+use std::{time::{Duration, Instant}, cmp::min};
 
 use winit::{
-    event::{Event as WinEvent, KeyboardInput, WindowEvent},
+    event::{
+        ElementState, Event as WinEvent, KeyboardInput, ModifiersState, MouseButton,
+        MouseScrollDelta, WindowEvent,
+    },
     event_loop::{ControlFlow, EventLoop},
 };
 pub struct Window {
@@ -10,12 +14,48 @@ pub struct Window {
 }
 
 pub enum Event {
-    Resize { width: u32, height: u32 },
-    Keyboard { key: KeyboardInput },
+    Resize {
+        width: u32,
+        height: u32,
+    },
+    CursorMove {
+        x: f32,
+        y: f32,
+        modifiers: ModifiersState,
+    },
+    CursorInput {
+        state: ElementState,
+        button: MouseButton,
+    },
+    Keyboard {
+        key: KeyboardInput,
+    },
     Redraw,
-    Loop { delta_time: Duration },
+    Loop {
+        delta_time: f32,
+        elapsed: f32,
+    },
 }
 
+
+pub struct Clock {
+    start: Instant,
+    now: f32,
+}
+impl Clock {
+    pub fn new() -> Self {
+        Self {
+            start: Instant::now(),
+            now: 0.0,
+        }
+    }
+    pub fn advance(&mut self) -> (f32, f32) {
+        let elapsed = self.start.elapsed().as_secs_f32();
+        let delta = elapsed - self.now;
+        self.now = elapsed;
+        (delta, self.now)
+    }
+}
 impl Window {
     pub fn new() -> Window {
         // env_logger::init();
@@ -26,9 +66,38 @@ impl Window {
         Window { event_loop, window }
     }
     pub fn run(self, mut runner: impl 'static + FnMut(Event)) -> ! {
-        let mut last_update_inst = std::time::Instant::now();
+        let mut clock = Clock::new();
         self.event_loop.run(move |event, _, control_flow| {
             *control_flow = match event {
+                WinEvent::WindowEvent {
+                    event:
+                        WindowEvent::MouseInput {
+                            device_id,
+                            state,
+                            button,
+                            modifiers,
+                        },
+                    ..
+                } => {
+                    runner(Event::CursorInput { state, button });
+                    ControlFlow::Poll
+                }
+                WinEvent::WindowEvent {
+                    event:
+                        WindowEvent::CursorMoved {
+                            device_id,
+                            position,
+                            modifiers,
+                        },
+                    ..
+                } => {
+                    runner(Event::CursorMove {
+                        x: position.x as f32,
+                        y: position.y as f32,
+                        modifiers,
+                    });
+                    ControlFlow::Poll
+                }
                 WinEvent::WindowEvent {
                     event: WindowEvent::Resized(size),
                     ..
@@ -48,10 +117,10 @@ impl Window {
                     ControlFlow::Poll
                 }
                 WinEvent::MainEventsCleared => {
-                    let delta_time = last_update_inst.elapsed();
-                    runner(Event::Loop { delta_time });
+                    let (delta_time, elapsed) = clock.advance();
+                    let target = 1.0 / 60.0;
+                    runner(Event::Loop { delta_time, elapsed });
                     self.window.request_redraw();
-                    last_update_inst = std::time::Instant::now();
                     ControlFlow::Poll
                 }
                 WinEvent::WindowEvent {

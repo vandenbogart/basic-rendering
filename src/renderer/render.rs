@@ -1,26 +1,28 @@
-use std::{cell::Ref, collections::HashMap, path::Path};
+use std::{cell::Ref, collections::HashMap, num::NonZeroU32, path::Path, rc::Rc, sync::Arc};
 
 use cgmath::One;
+use image::{ImageBuffer, Rgba, Rgba32FImage};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, Buffer, BufferUsages, Texture, TextureView,
+    BindGroup, Buffer, BufferUsages, SamplerDescriptor, Texture, TextureView,
 };
 
 use crate::{window::Window, EntityId, ResourceIndex};
 
 use super::{
     context::Context, loaders::obj::load_model, pipeline_default::DefaultPipeline,
-    GeometryComponent, Globals, Instance, Locals, ModelComponent, ModelResource,
+    pipeline_depth::DepthPipeline, GeometryComponent, Globals, Instance, Locals, ModelComponent,
+    ModelResource,
 };
 
 pub struct Renderer {
     pub context: Context,
-    globals: Globals,
     globals_buffer: Buffer,
     globals_bind_group: BindGroup,
-    depth_texture: Texture,
-    depth_texture_view: TextureView,
     default_pipeline: DefaultPipeline,
+    depth_pipeline: DepthPipeline,
+    pub depth_values: Vec<f32>,
+    pub depth_width: u32,
 }
 
 impl Renderer {
@@ -28,11 +30,6 @@ impl Renderer {
         let context = Context::new(window)
             .await
             .expect("Failed to initialize context");
-        let globals = Globals {
-            view_proj: cgmath::Matrix4::one().into(),
-            ambient_strength: 0.1,
-            ambient_color: [0.0, 1.0, 0.0],
-        };
         let globals_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Globals buffer"),
             size: std::mem::size_of::<Globals>() as wgpu::BufferAddress,
@@ -41,6 +38,7 @@ impl Renderer {
         });
 
         let default_pipeline = DefaultPipeline::new(&context);
+        let depth_pipeline = DepthPipeline::new(&context);
 
         let globals_bind_group = context
             .device
@@ -53,45 +51,21 @@ impl Renderer {
                 }],
             });
 
-        let (depth_texture, depth_texture_view) = Renderer::init_depth_texture(&context);
-
         Renderer {
             context,
-            globals,
             globals_buffer,
             globals_bind_group,
-            depth_texture,
-            depth_texture_view,
             default_pipeline,
+            depth_pipeline,
+            depth_values: Vec::new(),
+            depth_width: 0,
         }
     }
     pub fn resize(&mut self, width: u32, height: u32) {
         self.context.resize(width, height);
-        let (depth_texture, depth_texture_view) = Renderer::init_depth_texture(&self.context);
-        self.depth_texture = depth_texture;
-        self.depth_texture_view = depth_texture_view;
-    }
-    fn init_depth_texture(context: &Context) -> (Texture, TextureView) {
-        let depth_texture = context.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Depth texture"),
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            mip_level_count: 1,
-            sample_count: 1,
-            size: wgpu::Extent3d {
-                width: context.surface_config.width,
-                height: context.surface_config.height,
-                depth_or_array_layers: 1,
-            },
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        });
-
-        let depth_texture_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        (depth_texture, depth_texture_view)
+        self.depth_pipeline.resize(&self.context);
     }
     pub async fn create_model_resource(&self, filepath: String) -> ModelResource {
-        dbg!(&filepath);
         let model = load_model(
             &self.context.queue,
             &self.context.device,
@@ -101,17 +75,14 @@ impl Renderer {
         .unwrap();
         ModelResource::new(model)
     }
-    pub fn draw(&mut self, world: &mut crate::World, view_proj: cgmath::Matrix4<f32>) {
-        self.globals.view_proj = view_proj.into();
-        self.context.queue.write_buffer(
-            &self.globals_buffer,
-            0,
-            bytemuck::cast_slice(&[self.globals]),
-        );
+    pub async fn draw(&mut self, world: &crate::World, globals: Globals) {
+        self.context
+            .queue
+            .write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&[globals]));
         let locals = Locals {
             position: [0.0, 0.0, 0.0, 0.0],
-            diffuse_light_color: [1.0, 1.0, 1.0, 0.0],
-            diffuse_light_pos: [0.0, 5.0, 0.0, 0.0],
+            diffuse_light_color: [1.0, 1.0, 1.0, 0.7],
+            diffuse_light_pos: [100.0, 300.0, 0.0, 0.0],
         };
         let locals_buffer = self
             .context
@@ -215,7 +186,7 @@ impl Renderer {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture_view,
+                    view: &self.depth_pipeline.depth_texture_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: true,
@@ -240,7 +211,58 @@ impl Renderer {
             }
         }
 
+        self.depth_pipeline.make_pass(&view, &mut encoder);
+
+        let depth_texture_read_buffer =
+            self.context.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("DT read buf"),
+                size: (self.depth_pipeline.depth_texture.width()
+                    * self.depth_pipeline.depth_texture.height()
+                    * 4) as wgpu::BufferAddress,
+                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                texture: &self.depth_pipeline.depth_texture,
+                aspect: wgpu::TextureAspect::All,
+                mip_level: 0,
+                origin: wgpu::Origin3d {
+                    ..Default::default()
+                },
+            },
+            wgpu::ImageCopyBufferBase {
+                buffer: &depth_texture_read_buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: NonZeroU32::new(
+                        ((self.depth_pipeline.depth_texture.width() * 4) as f32 / 256.0).ceil()
+                            as u32
+                            * 256,
+                    ),
+                    rows_per_image: None,
+                },
+            },
+            self.depth_pipeline.depth_texture.size(),
+        );
+
         self.context.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+
+        let buffer_slice = depth_texture_read_buffer.slice(..);
+
+        let (tx, rx) = futures_intrusive::channel::shared::oneshot_channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send(result).unwrap();
+        });
+        self.context.device.poll(wgpu::Maintain::Wait);
+        rx.receive().await.unwrap().unwrap();
+
+        let data = buffer_slice.get_mapped_range();
+        let parse: Vec<f32> = bytemuck::cast_slice(&data).to_vec();
+        self.depth_values = parse;
+        self.depth_width = self.depth_pipeline.depth_texture.width();
+        drop(data);
+        depth_texture_read_buffer.unmap();
     }
 }

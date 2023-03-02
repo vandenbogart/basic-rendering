@@ -5,14 +5,17 @@ use std::{
 };
 
 use component::ComponentManager;
-use renderer::{render::Renderer, Globals};
+use renderer::{render::Renderer, Globals, ModelResource};
 use resource::ResourceManager;
 mod component;
 mod query;
+mod ray;
 pub mod renderer;
 mod resource;
 pub mod systems;
 pub mod window;
+pub mod entities;
+pub mod traits;
 
 type ComponentId = TypeId;
 type ComponentRef = Option<Rc<RefCell<dyn Any>>>;
@@ -22,7 +25,7 @@ pub trait Component {}
 
 type ResourceId = TypeId;
 pub type ResourceIndex = usize;
-type ResourceRef = Option<Rc<RefCell<dyn Any>>>;
+type ResourceRef = Option<Rc<dyn Any>>;
 type ResourceList = Vec<ResourceRef>;
 
 pub trait Resource {}
@@ -60,7 +63,7 @@ impl World {
     pub async fn create_resource<T: Resource + 'static>(
         &mut self,
         resource_path: &str,
-    ) -> ResourceIndex {
+    ) -> Rc<T> {
         let resource = self
             .renderer
             .borrow()
@@ -68,7 +71,7 @@ impl World {
             .await;
         self.resource_manager.create_resource(resource)
     }
-    pub fn get_resource<T: Resource + 'static>(&self, index: ResourceIndex) -> Ref<T> {
+    pub fn get_resource<T: Resource + 'static>(&self, index: ResourceIndex) -> T {
         self.resource_manager.get_resource::<T>(index)
     }
     pub async fn draw(&self, view_proj: cgmath::Matrix4<f32>) {

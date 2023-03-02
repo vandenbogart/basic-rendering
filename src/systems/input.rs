@@ -1,4 +1,4 @@
-use std::time::Duration;
+
 
 use winit::event::{ElementState, ModifiersState, MouseButton, VirtualKeyCode};
 
@@ -16,11 +16,11 @@ impl InputSystem {
     pub fn process_keyboard(&mut self, keycode: VirtualKeyCode, state: ElementState) {
         self.keys.push((keycode, state));
     }
-    pub fn process_mouse_move(&mut self, x: f32, y: f32, modifiers: ModifiersState) {
+    pub fn process_mouse_move(&mut self, x: f32, y: f32, _modifiers: ModifiersState) {
         self.mouse_pos.x = x;
         self.mouse_pos.y = y;
     }
-    pub fn process_mouse_click(&mut self, state: ElementState, button: MouseButton) {
+    pub fn process_mouse_click(&mut self, state: ElementState, _button: MouseButton) {
         if state == ElementState::Pressed {
             self.last_click_pos = Some(cgmath::point2(self.mouse_pos.x, self.mouse_pos.y));
         }
@@ -36,7 +36,7 @@ impl Default for InputSystem {
     }
 }
 impl System for InputSystem {
-    fn run(&mut self, world: &mut crate::World, dt: f32) {
+    fn run(&mut self, world: &mut crate::World, _dt: f32) {
         let result = world
             .query()
             .with_component::<ClickMoveComponent>()

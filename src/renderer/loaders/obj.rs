@@ -150,10 +150,12 @@ pub async fn load_model(
             });
 
             Mesh {
+                vertices,
                 vertex_buf,
                 index_buf,
                 name: m.name,
                 num_indices: m.mesh.indices.len() as u32,
+                indices: m.mesh.indices,
                 material_id: m.mesh.material_id,
             }
         })

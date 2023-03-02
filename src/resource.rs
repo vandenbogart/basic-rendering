@@ -15,12 +15,13 @@ impl ResourceManager {
         ResourceManager::default()
     }
 
-    pub fn create_resource<T: Resource + 'static>(&mut self, resource: T) -> ResourceIndex {
+    pub fn create_resource<T: Resource + 'static>(&mut self, resource: T) -> Rc<T> {
         let id = TypeId::of::<T>();
         match self.resource_store.get_mut(&id) {
             Some(list) => {
-                list.push(Some(Rc::new(RefCell::new(resource))));
-                list.len() - 1
+                let resource = Rc::new(resource);
+                list.push(Some(resource));
+                resource.clone()
             }
             None => {
                 self.resource_store.insert(id, Default::default());
@@ -29,7 +30,7 @@ impl ResourceManager {
         }
     }
 
-    pub fn get_resource<T: Resource + 'static>(&self, index: ResourceIndex) -> Ref<T> {
+    pub fn get_resource<T: Resource + 'static>(&self, index: ResourceIndex) -> T {
         let id = TypeId::of::<T>();
         let resource_list = self
             .resource_store
@@ -38,8 +39,7 @@ impl ResourceManager {
         let resource = resource_list
             .get(index)
             .expect("Resource cannot be found at index");
-        let borrow = resource.as_ref().unwrap().borrow();
-        Ref::map(borrow, |any| any.downcast_ref().unwrap())
+        resource.as_ref().unwrap().downcast_ref().unwrap()
     }
 }
 impl Default for ResourceManager {

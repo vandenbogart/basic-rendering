@@ -1,4 +1,4 @@
-use std::time::Duration;
+
 use cgmath::prelude::*;
 
 use crate::{Component, World};
@@ -43,3 +43,8 @@ impl ClickMoveComponent {
         }
     }
 }
+
+pub struct WalkableComponent {
+
+}
+impl Component for WalkableComponent {}

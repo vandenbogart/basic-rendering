@@ -1,13 +1,11 @@
-use std::{cell::Ref, collections::HashMap, num::NonZeroU32, path::Path, rc::Rc, sync::Arc};
+use std::{cell::Ref, collections::HashMap, num::NonZeroU32, path::Path};
 
-use cgmath::One;
-use image::{ImageBuffer, Rgba, Rgba32FImage};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, Buffer, BufferUsages, SamplerDescriptor, Texture, TextureView,
+    BindGroup, Buffer, BufferUsages,
 };
 
-use crate::{window::Window, EntityId, ResourceIndex};
+use crate::{window::Window, EntityId, ResourceIndex, Resource};
 
 use super::{
     context::Context, loaders::obj::load_model, pipeline_default::DefaultPipeline,
@@ -23,6 +21,7 @@ pub struct Renderer {
     depth_pipeline: DepthPipeline,
     pub depth_values: Vec<f32>,
     pub depth_width: u32,
+    depth_texture_read_buffer: wgpu::Buffer,
 }
 
 impl Renderer {
@@ -51,6 +50,7 @@ impl Renderer {
                 }],
             });
 
+        let depth_texture_read_buffer = Renderer::init_depth_read_buffer(&context);
         Renderer {
             context,
             globals_buffer,
@@ -59,10 +59,20 @@ impl Renderer {
             depth_pipeline,
             depth_values: Vec::new(),
             depth_width: 0,
+            depth_texture_read_buffer,
         }
+    }
+    pub fn init_depth_read_buffer(context: &Context) -> wgpu::Buffer {
+        context.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("DT read buf"),
+            size: (context.surface_config.width * context.surface_config.height * 8) as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        })
     }
     pub fn resize(&mut self, width: u32, height: u32) {
         self.context.resize(width, height);
+        self.depth_texture_read_buffer = Renderer::init_depth_read_buffer(&self.context);
         self.depth_pipeline.resize(&self.context);
     }
     pub async fn create_model_resource(&self, filepath: String) -> ModelResource {
@@ -213,56 +223,47 @@ impl Renderer {
 
         self.depth_pipeline.make_pass(&view, &mut encoder);
 
-        let depth_texture_read_buffer =
-            self.context.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("DT read buf"),
-                size: (self.depth_pipeline.depth_texture.width()
-                    * self.depth_pipeline.depth_texture.height()
-                    * 4) as wgpu::BufferAddress,
-                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-        encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTexture {
-                texture: &self.depth_pipeline.depth_texture,
-                aspect: wgpu::TextureAspect::All,
-                mip_level: 0,
-                origin: wgpu::Origin3d {
-                    ..Default::default()
-                },
-            },
-            wgpu::ImageCopyBufferBase {
-                buffer: &depth_texture_read_buffer,
-                layout: wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: NonZeroU32::new(
-                        ((self.depth_pipeline.depth_texture.width() * 4) as f32 / 256.0).ceil()
-                            as u32
-                            * 256,
-                    ),
-                    rows_per_image: None,
-                },
-            },
-            self.depth_pipeline.depth_texture.size(),
-        );
+        // encoder.copy_texture_to_buffer(
+        //     wgpu::ImageCopyTexture {
+        //         texture: &self.depth_pipeline.depth_texture,
+        //         aspect: wgpu::TextureAspect::All,
+        //         mip_level: 0,
+        //         origin: wgpu::Origin3d {
+        //             ..Default::default()
+        //         },
+        //     },
+        //     wgpu::ImageCopyBufferBase {
+        //         buffer: &self.depth_texture_read_buffer,
+        //         layout: wgpu::ImageDataLayout {
+        //             offset: 0,
+        //             bytes_per_row: NonZeroU32::new(
+        //                 ((self.depth_pipeline.depth_texture.width() * 4) as f32 / 256.0).ceil()
+        //                     as u32
+        //                     * 256,
+        //             ),
+        //             rows_per_image: None,
+        //         },
+        //     },
+        //     self.depth_pipeline.depth_texture.size(),
+        // );
 
         self.context.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 
-        let buffer_slice = depth_texture_read_buffer.slice(..);
+        // let buffer_slice = self.depth_texture_read_buffer.slice(..);
 
-        let (tx, rx) = futures_intrusive::channel::shared::oneshot_channel();
-        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            tx.send(result).unwrap();
-        });
-        self.context.device.poll(wgpu::Maintain::Wait);
-        rx.receive().await.unwrap().unwrap();
+        // let (tx, rx) = futures_intrusive::channel::shared::oneshot_channel();
+        // buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+        //     tx.send(result).unwrap();
+        // });
+        // self.context.device.poll(wgpu::Maintain::Wait);
+        // rx.receive().await.unwrap().unwrap();
 
-        let data = buffer_slice.get_mapped_range();
-        let parse: Vec<f32> = bytemuck::cast_slice(&data).to_vec();
-        self.depth_values = parse;
-        self.depth_width = self.depth_pipeline.depth_texture.width();
-        drop(data);
-        depth_texture_read_buffer.unmap();
+        // let data = buffer_slice.get_mapped_range();
+        // let parse: Vec<f32> = bytemuck::cast_slice(&data).to_vec();
+        // self.depth_values = parse;
+        // self.depth_width = self.depth_pipeline.depth_texture.width();
+        // drop(data);
+        // self.depth_texture_read_buffer.unmap();
     }
 }

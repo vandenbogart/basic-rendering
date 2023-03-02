@@ -1,12 +1,11 @@
-use std::num::NonZeroU32;
 
-use cgmath::prelude::*;
+
 use wgpu::{
     util::DeviceExt, vertex_attr_array, ColorTargetState, PipelineLayoutDescriptor, RenderPipeline,
-    RenderPipelineDescriptor, Texture, TextureView,
+    RenderPipelineDescriptor, TextureView,
 };
 
-use super::{context::Context, Instance, InstanceRaw, Vertex};
+use super::{context::Context};
 
 pub struct DepthPipeline {
     pub render_pipeline: RenderPipeline,

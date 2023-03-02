@@ -1,6 +1,6 @@
 use wgpu::{ColorTargetState, PipelineLayoutDescriptor, RenderPipeline, RenderPipelineDescriptor};
 
-use super::{context::Context, Instance, InstanceRaw, Vertex};
+use super::{context::Context, Instance, Vertex};
 
 pub struct DefaultPipeline {
     pub render_pipeline: RenderPipeline,

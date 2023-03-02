@@ -1,4 +1,4 @@
-use cgmath::{Rotation3, Vector3};
+use cgmath::prelude::*;
 use wgpu::{vertex_attr_array, Texture};
 
 use crate::{Component, Resource, ResourceIndex};
@@ -71,6 +71,7 @@ impl Instance {
         let prmat =
             cgmath::Matrix4::from_translation(self.position - cgmath::point3(0.0, 0.0, 0.0))
                 * cgmath::Matrix4::from(self.rotation);
+
         let nmat = cgmath::Matrix3::from(self.rotation);
         InstanceRaw {
             pr_matrix: prmat.into(),
@@ -84,6 +85,8 @@ pub struct Model {
     pub name: String,
 }
 pub struct Mesh {
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
     pub vertex_buf: wgpu::Buffer,
     pub index_buf: wgpu::Buffer,
     pub num_indices: u32,
@@ -92,7 +95,7 @@ pub struct Mesh {
 }
 
 pub struct ModelComponent {
-    model_index: ResourceIndex,
+    pub model_index: ResourceIndex,
 }
 impl ModelComponent {
     pub fn new(model_index: ResourceIndex) -> ModelComponent {
@@ -132,20 +135,27 @@ impl GeometryComponent {
             forward,
         }
     }
+    pub fn transform(&self) -> cgmath::Matrix4<f32> {
+        let instance = Instance {
+            position: self.position,
+            rotation: self.rotation,
+        };
+        instance.to_raw().pr_matrix.into()
+    }
 }
 impl Default for GeometryComponent {
     fn default() -> Self {
         Self {
             position: cgmath::Point3::new(0.0, 0.0, 0.0),
             rotation: cgmath::Quaternion::from_angle_y(cgmath::Rad(0.0)),
-            forward: Vector3::unit_x(),
+            forward: cgmath::Vector3::unit_x(),
         }
     }
 }
 impl Component for GeometryComponent {}
 
 pub struct ModelResource {
-    model: Model,
+    pub model: Model,
 }
 impl ModelResource {
     pub fn new(model: Model) -> ModelResource {

@@ -1,9 +1,9 @@
-use std::{f32::consts::{PI, LN_10}, time::{Duration, Instant}};
+use std::{f32::consts::{PI}, time::{Instant}};
 
 use cgmath::SquareMatrix;
 use winit::event::{ElementState, VirtualKeyCode};
 
-use crate::renderer::{CameraFollowComponent, GeometryComponent};
+use crate::{renderer::{CameraFollowComponent, GeometryComponent}, ray::Ray};
 
 use super::{System, ClickMoveComponent, ClickMoveState};
 
@@ -37,14 +37,13 @@ impl Camera {
         }
     }
     pub fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        OPENGL_TO_WGPU_MATRIX * proj * view
+        OPENGL_TO_WGPU_MATRIX * self.proj() * self.view()
     }
-    pub fn build_reverse_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        (OPENGL_TO_WGPU_MATRIX * proj * view).invert().unwrap()
+    pub fn view(&self) -> cgmath::Matrix4<f32> {
+        cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up)
+    }
+    pub fn proj(&self) -> cgmath::Matrix4<f32> {
+        OPENGL_TO_WGPU_MATRIX * cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar)
     }
 }
 
@@ -115,21 +114,30 @@ impl CameraSystem {
     pub fn view_proj(&self) -> cgmath::Matrix4<f32> {
         self.camera.build_view_projection_matrix()
     }
-    pub fn view_to_world_coords(&self, x: f32, y: f32, z: f32) -> cgmath::Point3<f32> {
-        let ndc = cgmath::vec4(2.0 * (x / self.width), 2.0 * ((self.height - y) / self.height), z, 1.0);
+    pub fn unproject_click(&self, x: f32, y: f32) -> cgmath::Point3<f32> {
+        let ndc = cgmath::vec4(2.0 * (x / self.width), 2.0 * ((self.height - y) / self.height), 0.99, 1.0);
         let ndc = ndc + cgmath::vec4(-1.0, -1.0, 0.0, 0.0);
-        let rv_mat = self.camera.build_reverse_view_projection_matrix();
-        let a = rv_mat * ndc;
-        let a = a / a.w;
-        // let L0 = self.camera.eye;
-        // let L = cgmath::point3(a.x, a.y, a.z) - L0;
-        // let n: cgmath::Vector3<f32> = cgmath::Vector3::unit_y();
-        // let n0 = cgmath::point3(0.0, 0.0, 0.0);
-        // let t = cgmath::dot(n0 - L0, n) / cgmath::dot(L, n);
-        // // todo project onto plane
-        // let a = L0 + t * L;
-        dbg!(a);
-        cgmath::point3(a.x, a.y, a.z)
+        let proj_i = self.camera.proj().invert().expect("Unable to invert proj matrix");
+        let view_c = proj_i * ndc;
+        let view_c = view_c / view_c.w;
+        let view_i = self.camera.view().invert().expect("Unable to invert view matrix");
+        let world_c = view_i * view_c;
+        cgmath::point3(world_c.x, world_c.y, world_c.z)
+    }
+    pub fn hit_test_mouse_click(&self, world: &crate::World, x: f32, y: f32) -> cgmath::Point3<f32> {
+        let a = self.camera.eye;
+        dbg!(&a);
+        let b = self.unproject_click(x, y);
+        dbg!(&b);
+        let ray = Ray::new(a, b - a);
+        let hits = ray.test(world);
+        dbg!(&hits);
+        if let Some(hit) = hits.get(0) {
+            return hit.position
+        }
+        else {
+            return cgmath::point3(b.x, b.y, self.camera.zfar)
+        }
     }
 }
 impl System for CameraSystem {
@@ -140,13 +148,7 @@ impl System for CameraSystem {
             let mut comp = result.get_component_mut::<ClickMoveComponent>(*ent);
             match (comp.last_click_pos, comp.state) {
                 (Some(pos), ClickMoveState::Move) => {
-                    let now = Instant::now();
-                    let r = world.renderer.borrow();
-                    let depth_values = &r.depth_values;
-                    let depth_width = r.depth_width;
-                    let z = depth_values[pos.y as usize * depth_width as usize + pos.x as usize];
-                    dbg!(z);
-                    comp.move_coord = Some(self.view_to_world_coords(pos.x, pos.y, z));
+                    comp.move_coord = Some(self.hit_test_mouse_click(world, pos.x, pos.y));
                     comp.state = ClickMoveState::Waiting;
                 },
                 _ => ()

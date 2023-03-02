@@ -4,7 +4,7 @@ use playground::{
     },
     systems::{
         camera::CameraSystem, input::InputSystem, movement::MovementSystem, ClickMoveComponent,
-        System,
+        System, WalkableComponent,
     },
     *,
 };
@@ -28,6 +28,7 @@ pub async fn run() -> anyhow::Result<()> {
     world.register_component::<GeometryComponent>();
     world.register_component::<ClickMoveComponent>();
     world.register_component::<CameraFollowComponent>();
+    world.register_component::<WalkableComponent>();
 
     let player_model = world
         .create_resource::<ModelResource>("./assets/cylinder.obj")
@@ -35,6 +36,7 @@ pub async fn run() -> anyhow::Result<()> {
     let floor_model = world
         .create_resource::<ModelResource>("./assets/floor.obj")
         .await;
+    let click_model = world.create_resource::<ModelResource>("./assets/policecar.obj").await;
 
     let entity = world.spawn();
     let model_component = ModelComponent::new(player_model);
@@ -58,6 +60,7 @@ pub async fn run() -> anyhow::Result<()> {
         entity,
         GeometryComponent::new(Some([0.0, 0.0, 0.0].into()), None, None),
     );
+    world.add_component(entity, WalkableComponent {});
     // let resource = renderer.create_model_resource(String::from("./assets/frog.obj")).await;
     // let model_index = world.create_resource::<ModelResource>(resource);
 
@@ -75,7 +78,7 @@ pub async fn run() -> anyhow::Result<()> {
             world.resize(width, height);
             camera_system.resize(width, height);
         }
-        window::Event::Loop { delta_time, elapsed } => {
+        window::Event::Loop { delta_time, elapsed: _ } => {
             camera_system.run(&mut world, delta_time);
             input.run(&mut world, delta_time);
             movement.run(&mut world, delta_time);

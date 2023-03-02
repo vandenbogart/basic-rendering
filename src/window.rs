@@ -1,10 +1,9 @@
-use core::f64;
-use std::{time::{Duration, Instant}, cmp::min};
+
+use std::{time::{Instant}};
 
 use winit::{
     event::{
-        ElementState, Event as WinEvent, KeyboardInput, ModifiersState, MouseButton,
-        MouseScrollDelta, WindowEvent,
+        ElementState, Event as WinEvent, KeyboardInput, ModifiersState, MouseButton, WindowEvent,
     },
     event_loop::{ControlFlow, EventLoop},
 };
@@ -72,10 +71,10 @@ impl Window {
                 WinEvent::WindowEvent {
                     event:
                         WindowEvent::MouseInput {
-                            device_id,
+                            device_id: _,
                             state,
                             button,
-                            modifiers,
+                            modifiers: _,
                         },
                     ..
                 } => {
@@ -85,7 +84,7 @@ impl Window {
                 WinEvent::WindowEvent {
                     event:
                         WindowEvent::CursorMoved {
-                            device_id,
+                            device_id: _,
                             position,
                             modifiers,
                         },
@@ -118,7 +117,7 @@ impl Window {
                 }
                 WinEvent::MainEventsCleared => {
                     let (delta_time, elapsed) = clock.advance();
-                    let target = 1.0 / 60.0;
+                    let _target = 1.0 / 60.0;
                     runner(Event::Loop { delta_time, elapsed });
                     self.window.request_redraw();
                     ControlFlow::Poll

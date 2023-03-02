@@ -1,8 +1,6 @@
-use std::{f32::consts::PI, time::Duration};
+use cgmath::prelude::*;
 
-use cgmath::Rotation3;
-
-use crate::renderer::GeometryComponent;
+use crate::{renderer::{GeometryComponent, ModelComponent, ModelResource}, ray::Ray};
 
 use super::{ClickMoveComponent, System};
 
@@ -24,8 +22,17 @@ impl System for MovementSystem {
             let mut geo = result.get_component_mut::<GeometryComponent>(*ent);
             match move_comp.move_towards(geo.position, dt) {
                 Some(pos) => {
-                    geo.position = pos
-                }
+                    drop(geo);
+                    let mut new_pos = pos.clone();
+                    new_pos.y += 10.0;
+                    let ray = Ray::new(new_pos, -1.0 * cgmath::Vector3::<f32>::unit_y());
+                    let hits = ray.test(world);
+                    if let Some(hit) = hits.get(0) {
+                        new_pos.y = hit.position.y + 1.0
+                    }
+                    let mut geo = result.get_component_mut::<GeometryComponent>(*ent);
+                    geo.position = new_pos;
+                },
                 None => (),
             }
         })

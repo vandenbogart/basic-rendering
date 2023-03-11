@@ -1,0 +1,30 @@
+2. Refactor resource manager and component manager
+    Resource manager:
+        Manage lifetime of a resource (should own all resources)
+        Resource
+            Everything loaded from a file
+        Manage Models, Sounds, Textures, etc
+        Fetch assets by handle
+        get_asset<AssetType>(asset_handle)
+
+    Components manager:
+        get all components for entity
+        get all components by type
+        get all entities with component set
+            need to map component type -> list[entity]
+                all keys of hashmap at component type
+                dedupe with subsequent component types
+            entity -> list[component]
+                maybe dont need this
+                how to check if entity has component
+            entity, component_type -> component
+                index component type and then entity hashmap to get component
+                optionally returns none if entity does not have component
+            component type -> list[component]
+                all values of hashmap at component type
+
+
+        
+to not be members of World
+3. Make resources better
+

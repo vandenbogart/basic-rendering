@@ -1,12 +1,10 @@
+use std::path::Path;
+
 use playground::{
     renderer::{
-        render::Renderer, CameraFollowComponent, GeometryComponent, ModelComponent, ModelResource,
+        render::Renderer,
     },
-    systems::{
-        camera::CameraSystem, input::InputSystem, movement::MovementSystem, ClickMoveComponent,
-        System, WalkableComponent,
-    },
-    *,
+    *, world::World, component_manager::ComponentManager, asset_manager::AssetManager, components::{model::Model, transform::Transform}, loaders::{obj::load_model}, systems::camera::CameraSystem,
 };
 use winit::event::KeyboardInput;
 fn main() {
@@ -17,77 +15,63 @@ pub async fn run() -> anyhow::Result<()> {
     let window = window::Window::new();
 
     let renderer = Renderer::new(&window).await;
-    let mut input = InputSystem::new();
-    let mut movement = MovementSystem::new();
-    let window_size = window.window.inner_size();
-    let mut camera_system = CameraSystem::new(window_size.width as f32, window_size.height as f32);
 
-    let mut world = World::new(renderer);
+    let mut world = World::new();
+    let size = window.window.inner_size();
+    let mut camera_system = CameraSystem::new(size.width as f32, size.height as f32);
 
-    world.register_component::<ModelComponent>();
-    world.register_component::<GeometryComponent>();
-    world.register_component::<ClickMoveComponent>();
-    world.register_component::<CameraFollowComponent>();
-    world.register_component::<WalkableComponent>();
 
-    let player_model = world
-        .create_resource::<ModelResource>("./assets/cylinder.obj")
-        .await;
-    let floor_model = world
-        .create_resource::<ModelResource>("./assets/floor.obj")
-        .await;
-    let click_model = world.create_resource::<ModelResource>("./assets/policecar.obj").await;
+    let mut cm = ComponentManager::new();
+    cm.register_component::<Model>();
+    cm.register_component::<Transform>();
 
-    let entity = world.spawn();
-    let model_component = ModelComponent::new(player_model);
+    let mut am = AssetManager::new();
 
-    world.add_component(entity, model_component);
+    let player_model = load_model(Path::new("./assets/cylinder.obj")).await?;
+    let asset_handle = am.create_asset(player_model);
 
-    world.add_component(
-        entity,
-        GeometryComponent::new(None, None, Some(cgmath::Vector3::unit_x() * -1.0)),
-    );
-    world.add_component(entity, CameraFollowComponent {});
-    world.add_component(
-        entity,
-        ClickMoveComponent::new(40.0),
-    );
+    let player = world.spawn();
+    let model = Model {
+        asset_handle,
+    };
+    let transform = Transform::new(None, None, None);
+    cm.add_component(model, player);
+    cm.add_component(transform, player);
 
-    let entity = world.spawn();
-    let model_component = ModelComponent::new(floor_model);
-    world.add_component(entity, model_component);
-    world.add_component(
-        entity,
-        GeometryComponent::new(Some([0.0, 0.0, 0.0].into()), None, None),
-    );
-    world.add_component(entity, WalkableComponent {});
-    // let resource = renderer.create_model_resource(String::from("./assets/frog.obj")).await;
-    // let model_index = world.create_resource::<ModelResource>(resource);
+    let floor = world.spawn();
+    let floor_model = load_model(Path::new("./assets/floor.obj")).await?;
+    let floor_asset_handle = am.create_asset(floor_model);
+    let floor_model = Model {
+        asset_handle: floor_asset_handle,
+    };
+    let floor_transform = Transform::new(None, None, None);
+    cm.add_component(floor_model, floor);
+    cm.add_component(floor_transform, floor);
 
-    // let entity = world.spawn();
-    // let model_component = ModelComponent::new(model_index);
-
-    // world.add_component(entity, model_component);
-    // world.add_component(entity, GeometryComponent::new(Some([5.0, 0.0, 5.0].into()), Some(Quaternion::from_angle_y(cgmath::Rad(PI)))));
-
+    //TODO: Create drawstatebuilder in renderer and build the drawstate
     window.run(move |event| match event {
         window::Event::Redraw => {
-            pollster::block_on(world.draw(camera_system.view_proj()));
+            let entities = world.get_entities();
+            let mut dsb = renderer.get_draw_state_builder();
+            for &entity in entities {
+                let model = cm.get_entity_component::<Model>(entity).unwrap();
+                let transform = cm.get_entity_component::<Transform>(entity).unwrap();
+                let model_asset = am.get_asset(model.asset_handle).unwrap();
+                dsb.add_model_instance(model_asset, transform)
+            }
+            dsb.set_view_proj(camera_system.view_proj());
+            let draw_state = dsb.build();
+            renderer.draw(draw_state);
         }
         window::Event::Resize { width, height } => {
-            world.resize(width, height);
-            camera_system.resize(width, height);
         }
         window::Event::Loop { delta_time, elapsed: _ } => {
+            use crate::systems::System;
             camera_system.run(&mut world, delta_time);
-            input.run(&mut world, delta_time);
-            movement.run(&mut world, delta_time);
         }
         window::Event::CursorInput { state, button } => {
-            input.process_mouse_click(state, button);
         }
-        window::Event::CursorMove { x, y, modifiers } => {
-            input.process_mouse_move(x, y, modifiers);
+        window::Event::CursorMove { x: _, y: _, modifiers: _ } => {
         }
         window::Event::Keyboard {
             key:
@@ -97,8 +81,7 @@ pub async fn run() -> anyhow::Result<()> {
                     ..
                 },
         } => {
-            camera_system.process_keyboard(keycode, state);
-            input.process_keyboard(keycode, state);
+            camera_system.process_keyboard(keycode, state)
         }
         _ => (),
     });

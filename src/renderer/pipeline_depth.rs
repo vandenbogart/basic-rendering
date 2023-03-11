@@ -5,7 +5,7 @@ use wgpu::{
     RenderPipelineDescriptor, TextureView,
 };
 
-use super::{context::Context};
+use super::{::Context};
 
 pub struct DepthPipeline {
     pub render_pipeline: RenderPipeline,
@@ -47,10 +47,10 @@ const DEPTH_VERTICES: &[DepthVertex] = &[
 const DEPTH_INDICES: &[u32] = &[0, 1, 2, 2, 3, 0];
 
 impl DepthPipeline {
-    pub fn new(context: &Context) -> Self {
-        let (depth_texture, depth_texture_view) = DepthPipeline::init_depth_texture(context);
-        let shader = context
-            .device
+    pub fn new(device: &wgpu::Device, surface_config: &wgpu::SurfaceConfiguration) -> Self {
+        let (depth_texture, depth_texture_view) = DepthPipeline::init_depth_texture();
+        let shader = 
+            device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("Depth shader"),
                 source: wgpu::ShaderSource::Wgsl(include_str!("depth.wgsl").into()),
@@ -59,7 +59,7 @@ impl DepthPipeline {
         let fragment = wgpu::FragmentState {
             entry_point: "fs_main",
             module: &shader,
-            targets: &[Some(ColorTargetState::from(context.surface_config.format))],
+            targets: &[Some(ColorTargetState::from(surface_config.format))],
         };
 
         let vertex = wgpu::VertexState {
@@ -73,8 +73,8 @@ impl DepthPipeline {
         };
 
         let bind_group_layout =
-            context
-                .device
+            
+                device
                 .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                     entries: &[
                         wgpu::BindGroupLayoutEntry {
@@ -97,7 +97,7 @@ impl DepthPipeline {
                     label: Some("Depth Bind Group"),
                 });
 
-        let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
+        let sampler =device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -110,8 +110,8 @@ impl DepthPipeline {
             ..Default::default()
         });
 
-        let bind_group = context
-            .device
+        let bind_group = 
+            device
             .create_bind_group(&wgpu::BindGroupDescriptor {
                 entries: &[
                     wgpu::BindGroupEntry {
@@ -127,32 +127,32 @@ impl DepthPipeline {
                 layout: &bind_group_layout,
             });
 
-        let vertex_buffer = context
-            .device
+        let vertex_buffer = 
+            device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 contents: bytemuck::cast_slice(DEPTH_VERTICES),
                 label: Some("Depth vt buf"),
                 usage: wgpu::BufferUsages::VERTEX,
             });
 
-        let index_buffer = context
-            .device
+        let index_buffer = 
+            device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 contents: bytemuck::cast_slice(DEPTH_INDICES),
                 label: Some("Depth ind buf"),
                 usage: wgpu::BufferUsages::INDEX,
             });
 
-        let layout_descriptor = context
-            .device
+        let layout_descriptor = 
+            device
             .create_pipeline_layout(&PipelineLayoutDescriptor {
                 label: Some("Depth Render Layout"),
                 bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
 
-        let render_pipeline = context
-            .device
+        let render_pipeline = 
+            device
             .create_render_pipeline(&RenderPipelineDescriptor {
                 depth_stencil: None,
                 fragment: Some(fragment),
@@ -186,16 +186,16 @@ impl DepthPipeline {
         }
     }
 
-    fn init_depth_texture(context: &Context) -> (wgpu::Texture, wgpu::TextureView) {
-        let depth_texture = context.device.create_texture(&wgpu::TextureDescriptor {
+    fn init_depth_texture(device: &wgpu::Device, surface_config: &wgpu::SurfaceConfiguration) -> (wgpu::Texture, wgpu::TextureView) {
+        let depth_texture =device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Depth texture"),
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
             mip_level_count: 1,
             sample_count: 1,
             size: wgpu::Extent3d {
-                width: context.surface_config.width,
-                height: context.surface_config.height,
+                width: surface_config.width,
+                height: surface_config.height,
                 depth_or_array_layers: 1,
             },
             usage: wgpu::TextureUsages::TEXTURE_BINDING
@@ -208,12 +208,12 @@ impl DepthPipeline {
         (depth_texture, depth_texture_view)
     }
 
-    pub fn resize(&mut self, context: &Context) {
-        let (depth_texture, depth_texture_view) = DepthPipeline::init_depth_texture(context);
+    pub fn resize(&mut self, ) {
+        let (depth_texture, depth_texture_view) = DepthPipeline::init_depth_texture();
         self.depth_texture = depth_texture;
         self.depth_texture_view = depth_texture_view;
-        self.bind_group = context
-            .device
+        self.bind_group = 
+            device
             .create_bind_group(&wgpu::BindGroupDescriptor {
                 entries: &[
                     wgpu::BindGroupEntry {

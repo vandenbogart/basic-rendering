@@ -1,26 +1,18 @@
-use cgmath::prelude::*;
-use wgpu::{vertex_attr_array, Texture};
-
-use crate::{Component, Resource, ResourceIndex};
-
-mod context;
-mod loaders;
+pub mod draw_state;
 mod pipeline_default;
-mod pipeline_depth;
 pub mod render;
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
 pub struct Globals {
     pub view_proj: [[f32; 4]; 4],
-    pub ambient_color: [f32; 3],
-    pub ambient_strength: f32,
+    pub ambient_color: [f32; 4],
+    pub ambient_strength: [f32; 4],
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
-pub struct Locals {
-    pub position: [f32; 4],
+struct Locals {
     pub diffuse_light_pos: [f32; 4],
     pub diffuse_light_color: [f32; 4],
 }
@@ -35,7 +27,7 @@ pub struct Vertex {
 }
 
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] =
-    vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Float32x3, 3 => Float32x3];
+    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Float32x3, 3 => Float32x3];
 impl Vertex {
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -58,7 +50,7 @@ pub struct InstanceRaw {
     pub n_matrix: [[f32; 3]; 3],
 }
 
-const INSTANCE_ATTRIBUTES: [wgpu::VertexAttribute; 7] = vertex_attr_array![4 => Float32x4, 5 => Float32x4, 6 => Float32x4, 7 => Float32x4, 8 => Float32x3, 9 => Float32x3, 10 => Float32x3];
+const INSTANCE_ATTRIBUTES: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![4 => Float32x4, 5 => Float32x4, 6 => Float32x4, 7 => Float32x4, 8 => Float32x3, 9 => Float32x3, 10 => Float32x3];
 impl Instance {
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -79,92 +71,4 @@ impl Instance {
         }
     }
 }
-pub struct Model {
-    pub meshes: Vec<Mesh>,
-    pub materials: Vec<Material>,
-    pub name: String,
-}
-pub struct Mesh {
-    pub vertices: Vec<Vertex>,
-    pub indices: Vec<u32>,
-    pub vertex_buf: wgpu::Buffer,
-    pub index_buf: wgpu::Buffer,
-    pub num_indices: u32,
-    pub name: String,
-    pub material_id: Option<usize>,
-}
 
-pub struct ModelComponent {
-    pub model_index: ResourceIndex,
-}
-impl ModelComponent {
-    pub fn new(model_index: ResourceIndex) -> ModelComponent {
-        ModelComponent { model_index }
-    }
-}
-impl Component for ModelComponent {}
-
-pub struct CameraFollowComponent {}
-impl Component for CameraFollowComponent {}
-pub struct GeometryComponent {
-    pub position: cgmath::Point3<f32>,
-    pub rotation: cgmath::Quaternion<f32>,
-    pub forward: cgmath::Vector3<f32>,
-}
-impl GeometryComponent {
-    pub fn new(
-        position: Option<cgmath::Point3<f32>>,
-        rotation: Option<cgmath::Quaternion<f32>>,
-        forward: Option<cgmath::Vector3<f32>>,
-    ) -> Self {
-        let position = match position {
-            Some(pos) => pos,
-            None => cgmath::Point3::new(0.0, 0.0, 0.0),
-        };
-        let rotation = match rotation {
-            Some(rot) => rot,
-            None => cgmath::Quaternion::from_angle_y(cgmath::Rad(0.0)),
-        };
-        let forward = match forward {
-            Some(vec) => vec,
-            None => cgmath::Vector3::unit_x(),
-        };
-        GeometryComponent {
-            position,
-            rotation,
-            forward,
-        }
-    }
-    pub fn transform(&self) -> cgmath::Matrix4<f32> {
-        let instance = Instance {
-            position: self.position,
-            rotation: self.rotation,
-        };
-        instance.to_raw().pr_matrix.into()
-    }
-}
-impl Default for GeometryComponent {
-    fn default() -> Self {
-        Self {
-            position: cgmath::Point3::new(0.0, 0.0, 0.0),
-            rotation: cgmath::Quaternion::from_angle_y(cgmath::Rad(0.0)),
-            forward: cgmath::Vector3::unit_x(),
-        }
-    }
-}
-impl Component for GeometryComponent {}
-
-pub struct ModelResource {
-    pub model: Model,
-}
-impl ModelResource {
-    pub fn new(model: Model) -> ModelResource {
-        ModelResource { model }
-    }
-}
-impl Resource for ModelResource {}
-
-pub struct Material {
-    pub name: String,
-    pub diffuse_texture: Option<Texture>,
-}

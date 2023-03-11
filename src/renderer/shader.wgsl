@@ -1,12 +1,11 @@
 // Vertex shader
 struct Globals {
     view_proj: mat4x4<f32>,
-    ambient_color: vec3<f32>,
+    ambient_color: vec4<f32>,
     ambient_strength: f32,
 }
 
 struct Locals {
-    position: vec4<f32>,
     diffuse_light_position: vec4<f32>,
     diffuse_light_color: vec4<f32>,
 }
@@ -73,11 +72,10 @@ fn vs_main(
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ambient_color = globals.ambient_color * globals.ambient_strength;
 
-
     let light_dir = normalize(locals.diffuse_light_position.xyz - in.world_position);
     let diffuse_intensity = max(dot(light_dir, in.world_normal), 0.0) * locals.diffuse_light_color.a;
     let diffuse_color = locals.diffuse_light_color.xyz * diffuse_intensity;
 
-    let result = (diffuse_intensity + ambient_color) * in.color;
+    let result = (diffuse_intensity + ambient_color.rgb) * in.color;
     return vec4<f32>(result, 1.0);
 }

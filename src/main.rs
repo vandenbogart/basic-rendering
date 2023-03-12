@@ -1,10 +1,14 @@
 use std::path::Path;
 
 use playground::{
-    renderer::{
-        render::Renderer,
-    },
-    *, world::World, component_manager::ComponentManager, asset_manager::AssetManager, components::{model::Model, transform::Transform}, loaders::{obj::load_model}, systems::camera::CameraSystem,
+    asset_manager::AssetManager,
+    component_manager::ComponentManager,
+    components::{model::Model, transform::Transform, walk_to::WalkTo, walkable_surface::WalkableSurface, click_move::ClickMove, click::Click},
+    loaders::obj::load_model,
+    renderer::render::Renderer,
+    systems::{camera::CameraSystem, movement::MovementSystem, click::ClickSystem},
+    world::World,
+    *,
 };
 use winit::event::KeyboardInput;
 fn main() {
@@ -19,11 +23,16 @@ pub async fn run() -> anyhow::Result<()> {
     let mut world = World::new();
     let size = window.window.inner_size();
     let mut camera_system = CameraSystem::new(size.width as f32, size.height as f32);
-
+    let mut movement_system = MovementSystem::new();
+    let mut click_system = ClickSystem::new();
 
     let mut cm = ComponentManager::new();
     cm.register_component::<Model>();
     cm.register_component::<Transform>();
+    cm.register_component::<WalkTo>();
+    cm.register_component::<WalkableSurface>();
+    cm.register_component::<Click>();
+    cm.register_component::<ClickMove>();
 
     let mut am = AssetManager::new();
 
@@ -31,12 +40,11 @@ pub async fn run() -> anyhow::Result<()> {
     let asset_handle = am.create_asset(player_model);
 
     let player = world.spawn();
-    let model = Model {
-        asset_handle,
-    };
+    let model = Model { asset_handle };
     let transform = Transform::new(None, None, None);
     cm.add_component(model, player);
     cm.add_component(transform, player);
+    cm.add_component(ClickMove::new(98.0), player);
 
     let floor = world.spawn();
     let floor_model = load_model(Path::new("./assets/floor.obj")).await?;
@@ -47,6 +55,7 @@ pub async fn run() -> anyhow::Result<()> {
     let floor_transform = Transform::new(None, None, None);
     cm.add_component(floor_model, floor);
     cm.add_component(floor_transform, floor);
+    cm.add_component(WalkableSurface {}, floor);
 
     //TODO: Create drawstatebuilder in renderer and build the drawstate
     window.run(move |event| match event {
@@ -54,8 +63,8 @@ pub async fn run() -> anyhow::Result<()> {
             let entities = world.get_entities();
             let mut dsb = renderer.get_draw_state_builder();
             for &entity in entities {
-                let model = cm.get_entity_component::<Model>(entity).unwrap();
-                let transform = cm.get_entity_component::<Transform>(entity).unwrap();
+                let model = cm.get_component::<Model>(entity).unwrap();
+                let transform = cm.get_component::<Transform>(entity).unwrap();
                 let model_asset = am.get_asset(model.asset_handle).unwrap();
                 dsb.add_model_instance(model_asset, transform)
             }
@@ -63,15 +72,27 @@ pub async fn run() -> anyhow::Result<()> {
             let draw_state = dsb.build();
             renderer.draw(draw_state);
         }
-        window::Event::Resize { width, height } => {
-        }
-        window::Event::Loop { delta_time, elapsed: _ } => {
+        window::Event::Resize { width, height } => {}
+        window::Event::Loop {
+            delta_time,
+            elapsed: _,
+        } => {
             use crate::systems::System;
-            camera_system.run(&mut world, delta_time);
+            camera_system.run(&mut world, &mut cm, &am, delta_time);
+            movement_system.run(&mut world, &mut cm, &am, delta_time);
+            click_system.run(&mut world, &mut cm, &am, delta_time);
         }
         window::Event::CursorInput { state, button } => {
+            click_system.process_click(state, button, &camera_system.camera);
         }
-        window::Event::CursorMove { x: _, y: _, modifiers: _ } => {
+        window::Event::CursorMove {
+            x,
+            y,
+            modifiers: _,
+        } => {
+            let norm_x = x / size.width as f32;
+            let norm_y = y / size.height as f32;
+            click_system.process_mousemove(norm_x, norm_y);
         }
         window::Event::Keyboard {
             key:
@@ -80,9 +101,7 @@ pub async fn run() -> anyhow::Result<()> {
                     virtual_keycode: Some(keycode),
                     ..
                 },
-        } => {
-            camera_system.process_keyboard(keycode, state)
-        }
+        } => camera_system.process_keyboard(keycode, state),
         _ => (),
     });
 }

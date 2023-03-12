@@ -1,41 +1,72 @@
+use std::slice::Iter;
+
 use cgmath::prelude::*;
 
-use crate::{renderer::{GeometryComponent, ModelComponent, ModelResource}, ray::Ray};
+use crate::{
+    asset_manager::AssetManager,
+    component_manager::ComponentManager,
+    components::{transform::Transform, walk_to::WalkTo, walkable_surface::WalkableSurface, click_move::ClickMove},
+    ray::Ray,
+    world::World, EntityHandle,
+};
 
-use super::{ClickMoveComponent, System};
+use super::System;
 
-pub struct MovementSystem {}
+pub struct MovementSystem {
+
+}
 impl MovementSystem {
     pub fn new() -> Self {
         Self::default()
     }
 }
 impl System for MovementSystem {
-    fn run(&mut self, world: &mut crate::World, dt: f32) {
-        let result = world
-            .query()
-            .with_component::<ClickMoveComponent>()
-            .with_component::<GeometryComponent>()
-            .execute();
-        result.get_entities().iter().for_each(|ent| {
-            let move_comp = result.get_component::<ClickMoveComponent>(*ent);
-            let mut geo = result.get_component_mut::<GeometryComponent>(*ent);
-            match move_comp.move_towards(geo.position, dt) {
-                Some(pos) => {
-                    drop(geo);
-                    let mut new_pos = pos.clone();
-                    new_pos.y += 10.0;
-                    let ray = Ray::new(new_pos, -1.0 * cgmath::Vector3::<f32>::unit_y());
-                    let hits = ray.test(world);
-                    if let Some(hit) = hits.get(0) {
-                        new_pos.y = hit.position.y + 1.0
-                    }
-                    let mut geo = result.get_component_mut::<GeometryComponent>(*ent);
-                    geo.position = new_pos;
-                },
-                None => (),
+    fn run(&mut self, world: &mut World, cm: &mut ComponentManager, am: &AssetManager, dt: f32) {
+        let entities = cm.get_all_by_type::<WalkTo>();
+        entities.iter().for_each(|(ent, walk_to)| {
+            let mut transform = cm
+                .mut_component::<Transform>(*ent)
+                .unwrap_or_else(|| panic!("Entity {:?} does not have a transform component", ent));
+            if let Some(target) = walk_to.target {
+                let walkable_surfaces: Vec<EntityHandle> = cm.get_all_by_type::<WalkableSurface>().into_iter().map(|(ent, _)| ent).collect();
+                let ray = Ray::new(
+                    cgmath::point3(transform.position.x, transform.position.y + 20.0, transform.position.z),
+                    -1.0 as f32 * cgmath::Vector3::unit_y(),
+                );
+                let hits = ray.test(walkable_surfaces.as_slice(), cm, am);
+                let floor_pos = hits.get(0).unwrap_or_else(|| {
+                    panic!("No walkable surfaces found for entity {:?}", ent)
+                }).position;
+
+                let new_y = floor_pos.y + 1.0;
+                let new_pos = (target - transform.position).normalize() * walk_to.speed * dt;
+                transform.position += new_pos;
+                transform.position.y = new_y;
             }
-        })
+        });
+
+        let entities = cm.get_all_by_type::<ClickMove>();
+        entities.iter().for_each(|(ent, click_move)| {
+            let mut transform = cm
+                .mut_component::<Transform>(*ent)
+                .unwrap_or_else(|| panic!("Entity {:?} does not have a transform component", ent));
+            if let Some(target) = click_move.target {
+                let walkable_surfaces: Vec<EntityHandle> = cm.get_all_by_type::<WalkableSurface>().into_iter().map(|(ent, _)| ent).collect();
+                let ray = Ray::new(
+                    cgmath::point3(transform.position.x, transform.position.y + 20.0, transform.position.z),
+                    -1.0 as f32 * cgmath::Vector3::unit_y(),
+                );
+                let hits = ray.test(walkable_surfaces.as_slice(), cm, am);
+                let floor_pos = hits.get(0).unwrap_or_else(|| {
+                    panic!("No walkable surfaces found for entity {:?}", ent)
+                }).position;
+
+                let new_y = floor_pos.y + 1.0;
+                let new_pos = (target - transform.position).normalize() * click_move.speed * dt;
+                transform.position += new_pos;
+                transform.position.y = new_y;
+            }
+        });
     }
 }
 impl Default for MovementSystem {

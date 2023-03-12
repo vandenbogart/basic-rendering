@@ -31,6 +31,11 @@ impl Transform {
             forward,
         }
     }
+    pub fn to_matrix(&self) -> cgmath::Matrix4<f32> {
+        let translation = cgmath::Matrix4::from_translation(self.position.to_vec());
+        let rotation = cgmath::Matrix4::from(self.rotation);
+        translation * rotation
+    }
 }
 impl Default for Transform {
     fn default() -> Self {

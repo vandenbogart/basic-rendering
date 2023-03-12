@@ -126,8 +126,18 @@ impl Window {
                     event: WindowEvent::KeyboardInput { input, .. },
                     ..
                 } => {
-                    runner(Event::Keyboard { key: input });
-                    ControlFlow::Poll
+                    match input.virtual_keycode {
+                        Some(key) => {
+                            if key == winit::event::VirtualKeyCode::Escape {
+                                ControlFlow::Exit
+                            }
+                            else {
+                                runner(Event::Keyboard { key: input });
+                                ControlFlow::Poll
+                            }
+                        }
+                        None => ControlFlow::Poll
+                    }
                 }
                 _ => ControlFlow::Poll,
             }

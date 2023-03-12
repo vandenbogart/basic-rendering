@@ -27,7 +27,15 @@ impl ComponentManager {
             panic!("Attempted to add an un-registered component");
         }
     }
-    pub fn get_entity_component<T: Component + 'static>(&self, entity: EntityHandle) -> Option<Ref<T>> {
+    pub fn del_component<T: Component + 'static>(&mut self, entity: EntityHandle) {
+        let id = TypeId::of::<T>();
+        if let Some(ent_comp_map) = self.components.get_mut(&id) {
+            ent_comp_map.remove(&entity);
+        } else {
+            panic!("Attempted to delete an un-registered component");
+        }
+    }
+    pub fn get_component<T: Component + 'static>(&self, entity: EntityHandle) -> Option<Ref<T>> {
         let id = TypeId::of::<T>();
         if let Some(ent_comp_map) = self.components.get(&id) {
             match ent_comp_map.get(&entity) {
@@ -38,7 +46,7 @@ impl ComponentManager {
             panic!("Attempted to get an un-registered component");
         }
     }
-    pub fn mut_entity_component<T: Component + 'static>(&self, entity: EntityHandle) -> Option<RefMut<T>> {
+    pub fn mut_component<T: Component + 'static>(&self, entity: EntityHandle) -> Option<RefMut<T>> {
         let id = TypeId::of::<T>();
         if let Some(ent_comp_map) = self.components.get(&id) {
             match ent_comp_map.get(&entity) {
@@ -55,6 +63,17 @@ impl ComponentManager {
             ent_comp_map
                 .iter()
                 .map(|(k, v)| (*k, Ref::map(v.borrow(), |c| c.downcast_ref::<T>().unwrap())))
+                .collect()
+        } else {
+            panic!("Attempted to get component list for unregistered component");
+        }
+    }
+    pub fn mut_all_by_type<T: Component + 'static>(&self) -> Vec<(EntityHandle, RefMut<T>)> {
+        let id = TypeId::of::<T>();
+        if let Some(ent_comp_map) = self.components.get(&id) {
+            ent_comp_map
+                .iter()
+                .map(|(k, v)| (*k, RefMut::map(v.borrow_mut(), |c| c.downcast_mut::<T>().unwrap())))
                 .collect()
         } else {
             panic!("Attempted to get component list for unregistered component");

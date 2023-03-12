@@ -1,17 +1,18 @@
 use crate::{
-    renderer::{GeometryComponent, ModelComponent, ModelResource},
-    EntityId, World, systems::WalkableComponent,
+    asset_manager::AssetManager,
+    component_manager::ComponentManager,
+    components::{model::Model, transform::Transform},
+    loaders, EntityHandle,
 };
 use cgmath::prelude::*;
 
-#[derive(Debug)]
 pub struct RayHit {
-    pub entityid: EntityId,
+    pub entity: EntityHandle,
     pub position: cgmath::Point3<f32>,
 }
 impl RayHit {
-    pub fn new(entityid: EntityId, position: cgmath::Point3<f32>) -> Self {
-        Self { entityid, position }
+    pub fn new(entity: EntityHandle, position: cgmath::Point3<f32>) -> Self {
+        Self { entity, position }
     }
 }
 struct Triangle(
@@ -30,23 +31,28 @@ impl Ray {
             direction,
         }
     }
-    pub fn test(&self, world: &World) -> Vec<RayHit> {
-        let result = world
-            .query()
-            .with_component::<GeometryComponent>()
-            .with_component::<ModelComponent>()
-            .with_component::<WalkableComponent>()
-            .execute();
-        let entities = result.get_entities();
+    pub fn test(
+        &self,
+        entities: &[EntityHandle],
+        cm: &ComponentManager,
+        am: &AssetManager,
+    ) -> Vec<RayHit> {
         let mut intersection_points = Vec::new();
         for ent in entities {
-            let model = result.get_component::<ModelComponent>(*ent);
-            let geo = result.get_component::<GeometryComponent>(*ent);
-            let mesh = world.get_resource::<ModelResource>(model.model_index);
-            for mesh in mesh.model.meshes.iter() {
+            let model = cm
+                .get_component::<Model>(*ent)
+                .unwrap_or_else(|| panic!("Entity {:?} does not have a model component", ent));
+            let transform = cm
+                .get_component::<Transform>(*ent)
+                .unwrap_or_else(|| panic!("Entity {:?} does not have a transform component", ent));
+            let asset = am
+                .get_asset::<loaders::Model>(model.asset_handle)
+                .unwrap_or_else(|| panic!("Asset {:?} does not exist", model.asset_handle));
+
+            for mesh in asset.asset.meshes.iter() {
                 let vertices = &mesh.vertices;
                 for chunk in mesh.indices.chunks(3) {
-                    let transform = geo.transform();
+                    let transform = transform.to_matrix();
                     let (v1, v2, v3) = (chunk[0], chunk[1], chunk[2]);
                     let (v1, v2, v3) = (
                         vertices[v1 as usize],
@@ -197,13 +203,13 @@ mod tests {
     #[test]
     fn test_transform() {
         let p = cgmath::point3(0.0, 1.0, 0.0);
-        let geo = GeometryComponent::new(
+        let geo = Transform::new(
             Some(cgmath::point3(5.0, 5.0, 5.0)),
             Some(cgmath::Quaternion::from_angle_x(cgmath::Deg(90.0))),
             None,
         );
-        
-        let result = Ray::apply_transform(p, geo.transform());
+
+        let result = Ray::apply_transform(p, geo.to_matrix());
         assert_eq!(result.distance(cgmath::point3(5.0, 5.0, 6.0)) < 0.1, true)
     }
 }

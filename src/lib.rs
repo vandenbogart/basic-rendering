@@ -6,9 +6,10 @@ pub mod loaders;
 pub mod window;
 pub mod world;
 pub mod systems;
+pub mod ray;
 
 
 use uuid::Uuid;
 
-#[derive(Hash, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
 pub struct EntityHandle(Uuid);

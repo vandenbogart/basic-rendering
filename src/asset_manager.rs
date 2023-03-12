@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 use std::{any::Any, collections::HashMap};
 
-#[derive(Hash, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
 pub struct AssetHandle(Uuid);
 
 pub struct Asset<T> {

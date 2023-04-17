@@ -19,9 +19,8 @@ var<uniform> locals: Locals;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
-    @location(1) tex_coords: vec2<f32>,
-    @location(2) normal: vec3<f32>,
-    @location(3) color: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) color: vec3<f32>,
 }
 
 struct InstanceInput {
@@ -62,7 +61,6 @@ fn vs_main(
     var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
     out.world_position = world_position.xyz;
     out.world_normal = normal_matrix *  model.normal;
-    out.tex_coords = model.tex_coords;
     out.color = model.color;
     out.clip_position = globals.view_proj * world_position;
     return out;

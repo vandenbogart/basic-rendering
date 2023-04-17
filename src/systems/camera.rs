@@ -27,13 +27,13 @@ const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 impl Camera {
     pub fn new(aspect: f32) -> Camera {
         Camera {
-            eye: (0.0, 100.0, 300.0).into(),
+            eye: (0.0, 10.0, 10.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3::unit_y(),
             aspect,
             fovy: 45.0,
             znear: 0.1,
-            zfar: 1000.0,
+            zfar: 100.0,
         }
     }
     pub fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
@@ -79,7 +79,7 @@ impl CameraSystem {
         Self {
             camera: Camera::new(width / height),
             speed: 1.0,
-            radius: 200.0,
+            radius: 10.0,
             pos_x: 0.0,
             pos_y: 0.0,
             up: 0.0,

@@ -65,8 +65,8 @@ use super::{Material, Mesh, Model};
 //     Ok(texture)
 // }
 
-pub async fn load_model(path: &std::path::Path) -> anyhow::Result<Model> {
-    let file = fs::File::open(&path)?;
+pub fn load_model(path: &std::path::Path) -> Model {
+    let file = fs::File::open(&path).unwrap();
     let mut model_file = io::BufReader::new(file);
     let (models, obj_mats) = tobj::load_obj_buf(
         &mut model_file,
@@ -80,9 +80,9 @@ pub async fn load_model(path: &std::path::Path) -> anyhow::Result<Model> {
             let mut mat = io::BufReader::new(fs::File::open(p2).unwrap());
             tobj::load_mtl_buf(&mut mat)
         },
-    )?;
+    ).unwrap();
     let mut materials = Vec::new();
-    for mat in &obj_mats? {
+    for mat in &obj_mats.unwrap() {
         let new_mat = Material {
             name: mat.name.to_string(),
         };
@@ -99,14 +99,6 @@ pub async fn load_model(path: &std::path::Path) -> anyhow::Result<Model> {
                         m.mesh.positions[i * 3 + 1],
                         m.mesh.positions[i * 3 + 2],
                     ],
-                    tex_coords: if m.mesh.texcoords.len() > 0 {
-                        [
-                            m.mesh.texcoords[i * 2 + 0],
-                            1.0 - m.mesh.texcoords[i * 2 + 1],
-                        ]
-                    } else {
-                        [0.0, 0.0]
-                    },
                     normals: [
                         m.mesh.normals[i * 3 + 0],
                         m.mesh.normals[i * 3 + 1],
@@ -134,9 +126,9 @@ pub async fn load_model(path: &std::path::Path) -> anyhow::Result<Model> {
         })
         .collect::<Vec<_>>();
 
-    Ok(Model {
+    Model {
         meshes,
         materials,
         name: String::from(path.to_str().unwrap()),
-    })
+    }
 }

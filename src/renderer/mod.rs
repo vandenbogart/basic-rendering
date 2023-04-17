@@ -1,4 +1,3 @@
-pub mod draw_state;
 mod pipeline_default;
 pub mod render;
 
@@ -21,13 +20,12 @@ struct Locals {
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
 pub struct Vertex {
     pub position: [f32; 3],
-    pub tex_coords: [f32; 2],
     pub normals: [f32; 3],
     pub color: [f32; 3],
 }
 
-const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 4] =
-    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Float32x3, 3 => Float32x3];
+const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x3];
 impl Vertex {
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {

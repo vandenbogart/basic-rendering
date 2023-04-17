@@ -1,22 +1,20 @@
-use std::{cell::Ref, collections::HashMap, path::Path};
+use std::collections::HashMap;
 
-use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, Buffer, BufferUsages,
+use wgpu::util::DeviceExt;
+
+use crate::{loaders::gltf::{GltfFile, DrawGltf, GltfFrameState}, window::Window};
+
+use super::{
+    pipeline_default::DefaultPipeline,
+    Globals, Locals,
 };
 
-use crate::window::Window;
-
-use super::{pipeline_default::DefaultPipeline, Globals, Instance, Locals, draw_state::{DrawState, Drawable, DrawStateBuilder}};
-
 pub struct Renderer {
-    queue: wgpu::Queue,
-    device: wgpu::Device,
+    pub queue: wgpu::Queue,
+    pub device: wgpu::Device,
     surface: wgpu::Surface,
-    surface_config: wgpu::SurfaceConfiguration,
-    globals_buffer: Buffer,
-    globals_bind_group: BindGroup,
-    default_pipeline: DefaultPipeline,
+    pub surface_config: wgpu::SurfaceConfiguration,
+    pub default_pipeline: DefaultPipeline,
     depth_texture: wgpu::Texture,
     depth_texture_view: wgpu::TextureView,
 }
@@ -74,29 +72,13 @@ impl Renderer {
             view_formats: vec![],
         };
         surface.configure(&device, &surface_config);
-        let globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Globals buffer"),
-            size: std::mem::size_of::<Globals>() as wgpu::BufferAddress,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
 
-        let default_pipeline = DefaultPipeline::new(&device, &surface_config);
+        let default_pipeline = DefaultPipeline::new(&device);
 
-        let globals_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("globals bind_group"),
-            layout: &default_pipeline.render_pipeline.get_bind_group_layout(0),
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: globals_buffer.as_entire_binding(),
-            }],
-        });
-
-        let (depth_texture, depth_texture_view) = Renderer::init_depth_texture(&device, &surface_config);
+        let (depth_texture, depth_texture_view) =
+            Renderer::init_depth_texture(&device, &surface_config);
 
         Renderer {
-            globals_buffer,
-            globals_bind_group,
             default_pipeline,
             queue,
             device,
@@ -106,7 +88,10 @@ impl Renderer {
             depth_texture_view,
         }
     }
-    fn init_depth_texture(device: &wgpu::Device, surface_config: &wgpu::SurfaceConfiguration) -> (wgpu::Texture, wgpu::TextureView) {
+    fn init_depth_texture(
+        device: &wgpu::Device,
+        surface_config: &wgpu::SurfaceConfiguration,
+    ) -> (wgpu::Texture, wgpu::TextureView) {
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Depth texture"),
             dimension: wgpu::TextureDimension::D2,
@@ -127,46 +112,59 @@ impl Renderer {
         let depth_texture_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
         (depth_texture, depth_texture_view)
     }
-    pub fn get_draw_state_builder(&self) -> DrawStateBuilder {
-        DrawStateBuilder::new(&self.device)
-    }
-    pub fn draw(&self, draw_state: DrawState) {
-        self.queue
-            .write_buffer(&self.globals_buffer, 0, bytemuck::bytes_of(&draw_state.globals));
+
+    pub fn draw(&self, gltfs: &mut Vec<GltfFrameState>, view_proj: cgmath::Matrix4<f32>) {
+        let output = self.surface.get_current_texture().unwrap();
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let globals = Globals {
+            view_proj: view_proj.into(),
+            ambient_color: [1.0, 1.0, 1.0, 1.0],
+            ambient_strength: [0.2, 0.0, 0.0, 0.0],
+        };
+        let globals_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Globals buffer"),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                contents: bytemuck::cast_slice(&[globals]),
+            });
+        let globals_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Locals Bind group"),
+            layout: &self.default_pipeline.globals_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: globals_buffer.as_entire_binding(),
+            }],
+        });
         let locals = Locals {
             diffuse_light_color: [1.0, 1.0, 1.0, 1.0],
             diffuse_light_pos: [30.0, 100.0, 0.0, 0.0],
         };
         let locals_buffer = self
             .device
-            .create_buffer_init(&BufferInitDescriptor {
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Locals buffer"),
                 contents: bytemuck::cast_slice(&[locals]),
-                usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
-        let locals_bind_group = self
+        let locals_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Locals Bind group"),
+            layout: &self.default_pipeline.locals_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: locals_buffer.as_entire_binding(),
+            }],
+        });
+        let mut encoder = self
             .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Locals Bind group"),
-                layout: &self
-                    .default_pipeline
-                    .render_pipeline
-                    .get_bind_group_layout(1),
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: locals_buffer.as_entire_binding(),
-                }],
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Pass Encoder"),
             });
-        let output = self.surface.get_current_texture().unwrap();
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder =self
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Pass Encoder"),
-                });
-
+        for frame_state in gltfs.iter_mut() {
+            frame_state.init_buffers(&self.device);
+        }
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -188,14 +186,11 @@ impl Renderer {
                 }),
             });
 
-            render_pass.set_pipeline(&self.default_pipeline.render_pipeline);
-            render_pass.set_bind_group(0, &self.globals_bind_group, &[]);
+            render_pass.set_bind_group(0, &globals_bind_group, &[]);
             render_pass.set_bind_group(1, &locals_bind_group, &[]);
-            for drawable in draw_state.drawables.iter() {
-                render_pass.set_vertex_buffer(0, drawable.vertex_buf.slice(..));
-                render_pass.set_index_buffer(drawable.index_buf.slice(..), wgpu::IndexFormat::Uint32);
-                render_pass.set_vertex_buffer(1, drawable.instance_buf.slice(..));
-                render_pass.draw_indexed(0..drawable.num_indices, 0, 0..drawable.num_instances);
+
+            for gltf in gltfs.iter() {
+                render_pass.draw_gltf(gltf);
             }
         }
         self.queue.submit(std::iter::once(encoder.finish()));
